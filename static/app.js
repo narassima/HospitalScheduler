@@ -425,6 +425,80 @@ const JSSolver = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// Tooltip Manager (JS-driven, immune to viewport overflow/clipping)
+// ─────────────────────────────────────────────────────────────
+const TooltipManager = {
+  el: null,
+  init() {
+    let el = document.getElementById('global-tooltip');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'global-tooltip';
+      el.className = 'global-tooltip';
+      document.body.appendChild(el);
+    }
+    this.el = el;
+
+    document.addEventListener('mouseover', (e) => {
+      const btn = e.target.closest('.info-btn');
+      if (btn) this.show(btn);
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const btn = e.target.closest('.info-btn');
+      if (btn) this.hide();
+    });
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.info-btn');
+      if (btn) {
+        e.stopPropagation();
+        this.show(btn);
+      } else {
+        this.hide();
+      }
+    });
+  },
+
+  show(btn) {
+    const text = btn.getAttribute('data-tip');
+    if (!text) return;
+
+    this.el.textContent = text;
+    this.el.classList.add('show');
+
+    const rect = btn.getBoundingClientRect();
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+
+    const btnCenterX = rect.left + rect.width / 2;
+    
+    let left = btnCenterX - this.el.offsetWidth / 2;
+    let top = rect.top - this.el.offsetHeight - 8;
+
+    const margin = 12;
+    const viewportWidth = window.innerWidth;
+    
+    if (left < margin) {
+      left = margin;
+    } else if (left + this.el.offsetWidth > viewportWidth - margin) {
+      left = viewportWidth - this.el.offsetWidth - margin;
+    }
+
+    if (top < margin) {
+      top = rect.bottom + 8;
+    }
+
+    this.el.style.left = (left + scrollX) + 'px';
+    this.el.style.top = (top + scrollY) + 'px';
+  },
+
+  hide() {
+    if (this.el) this.el.classList.remove('show');
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 // App state
 // ─────────────────────────────────────────────────────────────
 const App = {
@@ -437,6 +511,8 @@ const App = {
 
   // ── Initialise ────────────────────────────────────────────
   init() {
+    TooltipManager.init();
+
     // Set default dates (current month)
     const now  = new Date();
     const y    = now.getFullYear();
