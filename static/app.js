@@ -20,6 +20,411 @@ const DEPT_TEXT = [
 ];
 
 // ─────────────────────────────────────────────────────────────
+// Client-side Heuristic Constraint Solver (JSSolver)
+// ─────────────────────────────────────────────────────────────
+const JSSolver = {
+  solve(payload) {
+    const config = payload.config;
+    const resources = payload.resources;
+    const departments = payload.departments;
+    const absence = payload.absence;
+    const mapping = payload.mapping;
+    const dept_minmax = payload.dept_minmax;
+
+    // Parse dates
+    const start = new Date(config.start_date + 'T00:00:00');
+    const end = new Date(config.end_date + 'T00:00:00');
+    const dates = [];
+    const dateLabels = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      const isWE = d.getDay() === 0 || d.getDay() === 6;
+      dates.push(iso);
+      dateLabels.push({
+        iso,
+        day: d.getDate(),
+        dow: ['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()],
+        month: d.toLocaleString('default', { month: 'short' }),
+        is_weekend: isWE
+      });
+    }
+
+    const maxAlts = config.max_alternates !== undefined ? config.max_alternates : 3;
+    const results = [];
+
+    for (let alt = 0; alt <= maxAlts; alt++) {
+      const solution = this._optimize(resources, departments, dates, absence, mapping, dept_minmax, alt);
+      results.push(solution);
+    }
+
+    const meta = {
+      resources,
+      departments,
+      dates,
+      date_labels: dateLabels
+    };
+
+    return { success: true, session_id: 'local_session_' + Date.now(), results, meta };
+  },
+
+  _optimize(resources, departments, dates, absence, mapping, dept_minmax, altIndex) {
+    const assignment = {};
+    resources.forEach(r => {
+      assignment[r.name] = {};
+      dates.forEach(d => {
+        const isAbs = absence[r.name] && absence[r.name][d] === true;
+        assignment[r.name][d] = isAbs ? '__absent__' : null;
+      });
+    });
+
+    const activeDates = dates;
+    const deptNames = departments.map(d => d.name);
+
+    const canAssign = (rname, dname, d) => {
+      if (absence[rname] && absence[rname][d] === true) return false;
+      if (mapping[rname] && mapping[rname][dname] === 0) return false;
+      return true;
+    };
+
+    // Initial Heuristic Allocation
+    resources.forEach(r => {
+      const allowedDepts = deptNames.filter(dname => canAssign(r.name, dname));
+      if (allowedDepts.length === 0) return;
+
+      let consecutiveLeft = 0;
+      let currentDept = null;
+
+      activeDates.forEach(d => {
+        if (absence[r.name] && absence[r.name][d] === true) {
+          consecutiveLeft = 0;
+          currentDept = null;
+          return;
+        }
+
+        if (consecutiveLeft > 0 && currentDept && canAssign(r.name, currentDept, d)) {
+          assignment[r.name][d] = currentDept;
+          consecutiveLeft--;
+        } else {
+          const seed = Math.random();
+          if (seed < 0.75) {
+            const deptIndex = Math.floor(Math.random() * allowedDepts.length);
+            const dept = allowedDepts[deptIndex];
+            assignment[r.name][d] = dept;
+            consecutiveLeft = r.min_consecutive - 1;
+            currentDept = dept;
+          } else {
+            assignment[r.name][d] = null;
+            consecutiveLeft = 0;
+            currentDept = null;
+          }
+        }
+      });
+    });
+
+    // Local Search Optimization (Hill Climbing / Iterative Repair)
+    let bestAssignment = JSON.parse(JSON.stringify(assignment));
+    let bestPenalty = this._calcPenalty(bestAssignment, resources, departments, dates, mapping, dept_minmax);
+
+    let currentAssignment = JSON.parse(JSON.stringify(bestAssignment));
+    let currentPenalty = bestPenalty;
+
+    const maxSteps = 15000;
+    for (let step = 0; step < maxSteps; step++) {
+      if (currentPenalty === 0) break;
+
+      const res = resources[Math.floor(Math.random() * resources.length)];
+      const date = dates[Math.floor(Math.random() * dates.length)];
+
+      if (absence[res.name] && absence[res.name][date] === true) continue;
+
+      const allowedDepts = deptNames.filter(dname => canAssign(res.name, dname, date));
+      const choices = [null, ...allowedDepts];
+      const prevVal = currentAssignment[res.name][date];
+      const newVal = choices[Math.floor(Math.random() * choices.length)];
+
+      if (prevVal === newVal) continue;
+
+      const changes = [];
+      changes.push({ rname: res.name, d: date, old: prevVal, new: newVal });
+
+      if (res.min_consecutive > 1 && newVal !== null) {
+        const dateIdx = dates.indexOf(date);
+        for (let k = 1; k < res.min_consecutive; k++) {
+          if (dateIdx + k < dates.length) {
+            const nextDate = dates[dateIdx + k];
+            if (!(absence[res.name] && absence[res.name][nextDate] === true)) {
+              changes.push({ rname: res.name, d: nextDate, old: currentAssignment[res.name][nextDate], new: newVal });
+            }
+          }
+        }
+      }
+
+      changes.forEach(c => { currentAssignment[c.rname][c.d] = c.new; });
+
+      const newPenalty = this._calcPenalty(currentAssignment, resources, departments, dates, mapping, dept_minmax);
+
+      // Diversity penalty for alternate index
+      let altPenalty = 0;
+      if (altIndex > 0) {
+        // Soft diversity penalty
+      }
+
+      if (newPenalty + altPenalty <= currentPenalty) {
+        currentPenalty = newPenalty + altPenalty;
+        if (currentPenalty < bestPenalty) {
+          bestPenalty = currentPenalty;
+          bestAssignment = JSON.parse(JSON.stringify(currentAssignment));
+        }
+      } else {
+        changes.forEach(c => { currentAssignment[c.rname][c.d] = c.old; });
+      }
+    }
+
+    // Populate summaries & violations
+    const violations = [];
+    const resSummary = [];
+    const deptSummary = [];
+
+    resources.forEach(r => {
+      let totalDays = 0;
+      const deptDays = {};
+      departments.forEach(d => { deptDays[d.name] = 0; });
+
+      dates.forEach(d => {
+        const val = bestAssignment[r.name][d];
+        if (val && val !== '__absent__') {
+          totalDays++;
+          deptDays[val] = (deptDays[val] || 0) + 1;
+        }
+      });
+
+      const totalHours = totalDays * r.daily_hours;
+      const mn = r.min_hours;
+      const mx = r.max_hours;
+      const hoursOk = totalHours >= mn && totalHours <= mx;
+      const absentDays = dates.filter(d => absence[r.name] && absence[r.name][d] === true).length;
+
+      resSummary.push({
+        name: r.name,
+        total_days: totalDays,
+        total_hours: totalHours,
+        min_hours: mn,
+        max_hours: mx,
+        absent_days: absentDays,
+        dept_days: deptDays,
+        hours_ok: hoursOk
+      });
+
+      if (totalHours < mn) {
+        violations.push({
+          id: `V_RES_MIN_${r.id}`,
+          type: "Resource Min Hours",
+          resource: r.name,
+          department: "-",
+          date: "-",
+          details: `Resource worked ${totalHours} hours (minimum required: ${mn} hours).`,
+          severity: "Medium"
+        });
+      }
+      if (totalHours > mx) {
+        violations.push({
+          id: `V_RES_MAX_${r.id}`,
+          type: "Resource Max Hours",
+          resource: r.name,
+          department: "-",
+          date: "-",
+          details: `Resource worked ${totalHours} hours (maximum allowed: ${mx} hours).`,
+          severity: "Medium"
+        });
+      }
+
+      let consecutiveCount = 0;
+      let lastDept = null;
+      dates.forEach((d, idx) => {
+        const val = bestAssignment[r.name][d];
+        if (val !== lastDept) {
+          if (lastDept && lastDept !== '__absent__' && consecutiveCount < r.min_consecutive) {
+            violations.push({
+              id: `V_CONSEC_${r.id}_${idx}`,
+              type: "Consecutive Days Block",
+              resource: r.name,
+              department: lastDept,
+              date: dates[idx - consecutiveCount],
+              details: `Assignment of ${r.name} to ${lastDept} lasted only ${consecutiveCount} consecutive days (minimum required: ${r.min_consecutive}).`,
+              severity: "Low"
+            });
+          }
+          lastDept = val;
+          consecutiveCount = 1;
+        } else {
+          consecutiveCount++;
+        }
+      });
+      if (lastDept && lastDept !== '__absent__' && consecutiveCount < r.min_consecutive) {
+        violations.push({
+          id: `V_CONSEC_${r.id}_end`,
+          type: "Consecutive Days Block",
+          resource: r.name,
+          department: lastDept,
+          date: dates[dates.length - consecutiveCount],
+          details: `Assignment of ${r.name} to ${lastDept} lasted only ${consecutiveCount} consecutive days at the end of schedule (minimum required: ${r.min_consecutive}).`,
+          severity: "Low"
+        });
+      }
+    });
+
+    departments.forEach(dept => {
+      let totalHours = 0;
+      resources.forEach(r => {
+        dates.forEach(d => {
+          if (bestAssignment[r.name][d] === dept.name) {
+            totalHours += r.daily_hours;
+          }
+        });
+      });
+
+      const ok = totalHours >= dept.min_hours && totalHours <= dept.max_hours;
+      deptSummary.push({
+        name: dept.name,
+        total_hours: totalHours,
+        min_hours: dept.min_hours,
+        max_hours: dept.max_hours,
+        ok
+      });
+
+      if (totalHours < dept.min_hours) {
+        violations.push({
+          id: `V_DEPT_MIN_${dept.id}`,
+          type: "Dept Min Hours",
+          resource: "-",
+          department: dept.name,
+          date: "-",
+          details: `Department total coverage is ${totalHours} hours (minimum required: ${dept.min_hours} hours).`,
+          severity: "High"
+        });
+      }
+      if (totalHours > dept.max_hours) {
+        violations.push({
+          id: `V_DEPT_MAX_${dept.id}`,
+          type: "Dept Max Hours",
+          resource: "-",
+          department: dept.name,
+          date: "-",
+          details: `Department total coverage is ${totalHours} hours (maximum allowed: ${dept.max_hours} hours).`,
+          severity: "High"
+        });
+      }
+    });
+
+    resources.forEach(r => {
+      departments.forEach(dept => {
+        const mm = dept_minmax[r.name] ? dept_minmax[r.name][dept.name] : null;
+        if (mm) {
+          let days = 0;
+          dates.forEach(d => {
+            if (bestAssignment[r.name][d] === dept.name) days++;
+          });
+          if (days < mm.min) {
+            violations.push({
+              id: `V_DEPT_MM_MIN_${r.id}_${dept.id}`,
+              type: "Dept Min Days per Resource",
+              resource: r.name,
+              department: dept.name,
+              date: "-",
+              details: `Resource ${r.name} scheduled for ${days} days in ${dept.name} (minimum required: ${mm.min} days).`,
+              severity: "Medium"
+            });
+          }
+          if (days > mm.max) {
+            violations.push({
+              id: `V_DEPT_MM_MAX_${r.id}_${dept.id}`,
+              type: "Dept Max Days per Resource",
+              resource: r.name,
+              department: dept.name,
+              date: "-",
+              details: `Resource ${r.name} scheduled for ${days} days in ${dept.name} (maximum allowed: ${mm.max} days).`,
+              severity: "Medium"
+            });
+          }
+        }
+      });
+    });
+
+    return {
+      alternate_index: altIndex,
+      label: altIndex === 0 ? "Schedule" : `Alt ${altIndex}`,
+      is_feasible: violations.length === 0,
+      violations,
+      assignment: bestAssignment,
+      summary: {
+        resources: resSummary,
+        departments: deptSummary
+      }
+    };
+  },
+
+  _calcPenalty(assignment, resources, departments, dates, mapping, dept_minmax) {
+    let penalty = 0;
+
+    resources.forEach(r => {
+      let days = 0;
+      dates.forEach(d => {
+        const val = assignment[r.name][d];
+        if (val && val !== '__absent__') days++;
+      });
+      const hrs = days * r.daily_hours;
+      if (hrs < r.min_hours) penalty += (r.min_hours - hrs) * 10;
+      if (hrs > r.max_hours) penalty += (hrs - r.max_hours) * 10;
+
+      let consecutiveCount = 0;
+      let lastDept = null;
+      dates.forEach(d => {
+        const val = assignment[r.name][d];
+        if (val !== lastDept) {
+          if (lastDept && lastDept !== '__absent__' && consecutiveCount < r.min_consecutive) {
+            penalty += (r.min_consecutive - consecutiveCount) * 15;
+          }
+          lastDept = val;
+          consecutiveCount = 1;
+        } else {
+          consecutiveCount++;
+        }
+      });
+      if (lastDept && lastDept !== '__absent__' && consecutiveCount < r.min_consecutive) {
+        penalty += (r.min_consecutive - consecutiveCount) * 15;
+      }
+    });
+
+    departments.forEach(dept => {
+      let hrs = 0;
+      resources.forEach(r => {
+        dates.forEach(d => {
+          if (assignment[r.name][d] === dept.name) hrs += r.daily_hours;
+        });
+      });
+      if (hrs < dept.min_hours) penalty += (dept.min_hours - hrs) * 5;
+      if (hrs > dept.max_hours) penalty += (hrs - dept.max_hours) * 5;
+    });
+
+    resources.forEach(r => {
+      departments.forEach(dept => {
+        const mm = dept_minmax[r.name] ? dept_minmax[r.name][dept.name] : null;
+        if (mm) {
+          let days = 0;
+          dates.forEach(d => {
+            if (assignment[r.name][d] === dept.name) days++;
+          });
+          if (days < mm.min) penalty += (mm.min - days) * 8;
+          if (days > mm.max) penalty += (days - mm.max) * 8;
+        }
+      });
+    });
+
+    return penalty;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 // App state
 // ─────────────────────────────────────────────────────────────
 const App = {
@@ -800,7 +1205,28 @@ const App = {
       if (lsi > 0) loadSteps[lsi - 1]?.classList.replace('active', 'done');
       if (lsi < loadSteps.length) loadSteps[lsi]?.classList.add('active');
       lsi++;
-    }, 600);
+    }, 400);
+
+    // Check if we are running in a static environment (like GitHub Pages or file://)
+    const isStaticEnv = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
+
+    if (isStaticEnv) {
+      console.log('[JSSolver] Static environment detected — running client-side constraint solver.');
+      setTimeout(() => {
+        try {
+          const data = JSSolver.solve(payload);
+          clearInterval(lInterval);
+          this.sessionId = data.session_id;
+          this.results   = data.results;
+          this.meta      = data.meta;
+          this._renderResults();
+        } catch (err) {
+          clearInterval(lInterval);
+          this._showError(`Client-side Solver Error: ${err.message}`);
+        }
+      }, 1000);
+      return;
+    }
 
     try {
       const resp = await fetch('/api/generate', {
@@ -808,6 +1234,8 @@ const App = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       clearInterval(lInterval);
 
@@ -823,8 +1251,21 @@ const App = {
       this._renderResults();
 
     } catch (err) {
-      clearInterval(lInterval);
-      this._showError(`Network error: ${err.message}`);
+      console.warn('[JSSolver] Backend unavailable — falling back to client-side constraint solver.', err);
+      // Fallback solve
+      setTimeout(() => {
+        try {
+          const data = JSSolver.solve(payload);
+          clearInterval(lInterval);
+          this.sessionId = data.session_id;
+          this.results   = data.results;
+          this.meta      = data.meta;
+          this._renderResults();
+        } catch (fallbackErr) {
+          clearInterval(lInterval);
+          this._showError(`Solver Failure: ${fallbackErr.message}`);
+        }
+      }, 1000);
     }
   },
 
