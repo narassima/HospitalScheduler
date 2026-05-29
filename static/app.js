@@ -468,9 +468,6 @@ const TooltipManager = {
     this.el.classList.add('show');
 
     const rect = btn.getBoundingClientRect();
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
-
     const btnCenterX = rect.left + rect.width / 2;
     
     let left = btnCenterX - this.el.offsetWidth / 2;
@@ -489,8 +486,8 @@ const TooltipManager = {
       top = rect.bottom + 8;
     }
 
-    this.el.style.left = (left + scrollX) + 'px';
-    this.el.style.top = (top + scrollY) + 'px';
+    this.el.style.left = left + 'px';
+    this.el.style.top = top + 'px';
   },
 
   hide() {

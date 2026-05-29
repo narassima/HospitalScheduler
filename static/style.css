@@ -737,8 +737,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* ── Global JS Tooltip ───────────────────────────────────────── */
 .global-tooltip {
-  position: absolute;
-  z-index: 10000;
+  position: fixed;
+  z-index: 999999;
   background: #111827;
   border: 1px solid rgba(59, 130, 246, 0.4);
   color: #f3f4f6;
