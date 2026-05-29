@@ -470,20 +470,24 @@ const TooltipManager = {
     const rect = btn.getBoundingClientRect();
     const btnCenterX = rect.left + rect.width / 2;
     
+    // Position below the button by default
     let left = btnCenterX - this.el.offsetWidth / 2;
-    let top = rect.top - this.el.offsetHeight - 8;
+    let top = rect.bottom + 8; // 8px below the button
 
     const margin = 12;
     const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
     
+    // Horizontal boundary checks
     if (left < margin) {
       left = margin;
     } else if (left + this.el.offsetWidth > viewportWidth - margin) {
       left = viewportWidth - this.el.offsetWidth - margin;
     }
 
-    if (top < margin) {
-      top = rect.bottom + 8;
+    // Vertical boundary check: if it runs off the bottom of the viewport, show above instead
+    if (top + this.el.offsetHeight > viewportHeight - margin) {
+      top = rect.top - this.el.offsetHeight - 8;
     }
 
     this.el.style.left = left + 'px';
