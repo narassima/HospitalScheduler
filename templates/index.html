@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable Scheduler | Smart Scheduling System</title>
+  <meta name="description" content="AI-powered timetable and appointment scheduler for doctors, departments, and resources. Constraint-based scheduling with violation reporting." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════ TOP NAV ══════════════════════════════════ -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    </div>
+    <span class="brand-name">TimetableAI</span>
+    <span class="brand-badge">Scheduler</span>
+  </div>
+  <div class="navbar-actions">
+    <span class="nav-status" id="nav-status">Ready</span>
+    <button class="btn-icon" id="btn-theme-toggle" onclick="App.toggleTheme()" title="Toggle Light/Dark Theme">
+      <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      Theme
+    </button>
+    <button class="btn-icon" id="btn-download" style="display:none" onclick="App.downloadExcel()" title="Download Excel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download Excel
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ MAIN LAYOUT ══════════════════════════════════ -->
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-steps">
+      <div class="step-item active" id="si-1" onclick="App.tryGoToStep(1)">
+        <div class="step-num">1</div>
+        <div class="step-info"><div class="step-label">Configuration</div><div class="step-sub">Period & counts</div></div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-item" id="si-2" onclick="App.tryGoToStep(2)">
+        <div class="step-num">2</div>
+        <div class="step-info"><div class="step-label">Resources</div><div class="step-sub">People & hours</div></div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-item" id="si-3" onclick="App.tryGoToStep(3)">
+        <div class="step-num">3</div>
+        <div class="step-info"><div class="step-label">Departments</div><div class="step-sub">Tasks & coverage</div></div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-item" id="si-4" onclick="App.tryGoToStep(4)">
+        <div class="step-num">4</div>
+        <div class="step-info"><div class="step-label">Absence Calendar</div><div class="step-sub">Days off</div></div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-item" id="si-5" onclick="App.tryGoToStep(5)">
+        <div class="step-num">5</div>
+        <div class="step-info"><div class="step-label">Dept Mapping</div><div class="step-sub">Feasibility</div></div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-item" id="si-6" onclick="App.tryGoToStep(6)">
+        <div class="step-num">6</div>
+        <div class="step-info"><div class="step-label">Min / Max Days</div><div class="step-sub">Day constraints</div></div>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-tip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Sat &amp; Sun are marked absent by default. Override in Step 4.
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="main-content">
+
+    <!-- ─── STEP 1: Config ─────────────────────────────────────────────── -->
+    <div class="step-page active" id="page-1">
+      <div class="page-header">
+        <h1>Configuration</h1>
+        <p>Define the planning period, number of resources and departments.</p>
+      </div>
+      <div class="form-card">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="cfg-start">Plan Start Date <span class="info-btn" data-tip="The start date of the scheduling period. The scheduler will generate assignments starting on this day.">i</span></label>
+            <input type="date" id="cfg-start" />
+          </div>
+          <div class="form-group">
+            <label for="cfg-end">Plan End Date <span class="info-btn" data-tip="The end date of the scheduling period. The planner will generate assignments up to and including this day.">i</span></label>
+            <input type="date" id="cfg-end" />
+          </div>
+          <div class="form-group">
+            <label for="cfg-time-unit">Scheduling Time Unit <span class="info-btn" data-tip="The time metric used for planning constraints (Hours, Minutes, Days, Sessions, Slots, or Shifts) based on your custom requirements.">i</span></label>
+            <select id="cfg-time-unit" onchange="App.onTimeUnitChange()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 14px; color-scheme: dark; outline: none; width: 100%;">
+              <option value="Hours" selected>Hours (hrs)</option>
+              <option value="Minutes">Minutes (mins)</option>
+              <option value="Days">Days (days)</option>
+              <option value="Sessions">Sessions (sessions)</option>
+              <option value="Slots">Slots (slots)</option>
+              <option value="Shifts">Shifts (shifts)</option>
+            </select>
+          </div>
+          <div class="form-group" id="cfg-working-day-hours-group" style="display: block;">
+            <label for="cfg-working-day-hours">Hours in a Working Day <span class="tip">(default 8)</span> <span class="info-btn" data-tip="The total working hours standard for a full day. Used to automatically calculate daily capacities when Hours or Minutes is selected.">i</span></label>
+            <input type="number" id="cfg-working-day-hours" min="1" max="24" value="8" />
+          </div>
+          <div class="form-group" id="cfg-time-conversion-group" style="display: none;">
+            <label id="cfg-time-conversion-label" for="cfg-time-conversion">Hours per Session</label>
+            <input type="number" id="cfg-time-conversion" min="0.1" step="0.1" value="2" />
+          </div>
+          <div class="form-group">
+            <label for="cfg-max-alt">Max Alternate Schedules to Generate <span class="tip">(default is 3)</span> <span class="info-btn" data-tip="The maximum number of distinct alternative schedules (alternate options) generated by the AI solver.">i</span></label>
+            <input type="number" id="cfg-max-alt" min="0" max="20" value="3" />
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <span></span>
+        <button class="btn btn-primary" onclick="App.nextStep()">Next: Resources <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 2: Resources ──────────────────────────────────────────── -->
+    <div class="step-page" id="page-2">
+      <div class="page-header">
+        <h1>Resources</h1>
+        <p>Enter names and work-hour constraints for each person.</p>
+      </div>
+      <div class="form-card overflow-x">
+        <table class="data-table" id="resources-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name <span class="req">*</span> <span class="info-btn" data-tip="The name of the resource (e.g., Dr. Smith, Technician, etc.) to be scheduled.">i</span></th>
+              <th id="th-res-minh">Min Work Hours <span class="tip">(period)</span> <span class="info-btn" data-tip="The minimum cumulative work time this resource must be scheduled for across the entire planning period.">i</span></th>
+              <th id="th-res-maxh">Max Work Hours <span class="tip">(period)</span> <span class="info-btn" data-tip="The maximum cumulative work time this resource can be scheduled for across the entire planning period.">i</span></th>
+              <th id="th-res-daily">Daily Work Hours <span class="info-btn" data-tip="The standard capacity allocation scheduled for this resource on a single assigned day.">i</span></th>
+              <th>Min Consecutive Days <span class="info-btn" data-tip="The consecutive scheduling block size. Enforces that any assignment must run in a continuous sequence of at least this many days.">i</span></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="resources-body"></tbody>
+        </table>
+        <div style="padding: 12px 16px;">
+          <button class="btn btn-ghost btn-sm" id="btn-add-resource" onclick="App.addResourceRow()" style="border: 1px dashed var(--border); width: 100%; border-radius: 6px; padding: 10px;">+ Add Resource</button>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="App.prevStep()">← Back</button>
+        <button class="btn btn-primary" onclick="App.nextStep()">Next: Departments <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 3: Departments ────────────────────────────────────────── -->
+    <div class="step-page" id="page-3">
+      <div class="page-header">
+        <h1>Departments</h1>
+        <p>Define departments and their required coverage hours.</p>
+      </div>
+      <div class="form-card overflow-x">
+        <table class="data-table" id="depts-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Department Name <span class="req">*</span> <span class="info-btn" data-tip="The name of the department, room, or task (e.g., Cardiology, ICU, Ward) requiring scheduling.">i</span></th>
+              <th id="th-dept-minh">Min Total Hours <span class="tip">(period)</span> <span class="info-btn" data-tip="The minimum total coverage time required for this department. Indicates the total number of days/hours for which the department should be functional.">i</span></th>
+              <th id="th-dept-maxh">Max Total Hours <span class="tip">(period)</span> <span class="info-btn" data-tip="The maximum total coverage time allowed for this department.">i</span></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="depts-body"></tbody>
+        </table>
+        <div style="padding: 12px 16px;">
+          <button class="btn btn-ghost btn-sm" id="btn-add-dept" onclick="App.addDeptRow()" style="border: 1px dashed var(--border); width: 100%; border-radius: 6px; padding: 10px;">+ Add Department</button>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="App.prevStep()">← Back</button>
+        <button class="btn btn-primary" onclick="App.nextStep()">Next: Absence Calendar <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 4: Absence Calendar ──────────────────────────────────── -->
+    <div class="step-page" id="page-4">
+      <div class="page-header">
+        <h1>Absence Calendar <span class="info-btn" data-tip="Toggle availability for specific resource dates. Red weekend days are pre-marked absent by default. Drag horizontally to toggle a range of dates.">i</span></h1>
+        <p>Click any cell to toggle <strong>Absent / Available</strong>. Weekends are pre-marked absent.</p>
+        <div class="calendar-legend">
+          <span class="leg-item"><span class="leg-dot weekend"></span> Weekend (pre-absent)</span>
+          <span class="leg-item"><span class="leg-dot absent"></span> Absent</span>
+          <span class="leg-item"><span class="leg-dot available"></span> Available</span>
+        </div>
+        <div class="bulk-actions" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+          <button class="btn btn-xs" onclick="App.bulkAbsence('weekends')">Exclude Saturdays &amp; Sundays</button>
+          <button class="btn btn-xs" onclick="App.bulkAbsence('saturdays')">Exclude Saturdays</button>
+          <button class="btn btn-xs" onclick="App.bulkAbsence('sundays')">Exclude Sundays</button>
+          <button class="btn btn-xs btn-ghost" onclick="App.bulkAbsence('allow_saturdays')">Allow Saturdays</button>
+          <button class="btn btn-xs btn-ghost" onclick="App.bulkAbsence('allow_sundays')">Allow Sundays</button>
+          <button class="btn btn-xs btn-ghost" onclick="App.bulkAbsence('clear')">Clear all</button>
+        </div>
+      </div>
+      <div class="form-card p0 overflow-x">
+        <div id="absence-calendar"></div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="App.prevStep()">← Back</button>
+        <button class="btn btn-primary" onclick="App.nextStep()">Next: Dept Mapping <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 5: Dept Mapping ───────────────────────────────────────── -->
+    <div class="step-page" id="page-5">
+      <div class="page-header">
+        <h1>Department Mapping <span class="info-btn" data-tip="Toggling a switch ON permits the resource to be scheduled to that department. Toggling OFF prevents any assignments.">i</span></h1>
+        <p>Toggle the switch to indicate which departments each resource <strong>can</strong> be assigned to.</p>
+      </div>
+      <div class="form-card overflow-x">
+        <div id="mapping-matrix"></div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="App.prevStep()">← Back</button>
+        <button class="btn btn-primary" onclick="App.nextStep()">Next: Min/Max Days <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 6: MinMax Days ────────────────────────────────────────── -->
+    <div class="step-page" id="page-6">
+      <div class="page-header">
+        <h1>Min / Max Days per Resource per Department</h1>
+        <p>Set minimum and maximum number of days each resource must/can work in each department. Leave at 0 / 999 for no constraint.</p>
+      </div>
+      <div class="form-card overflow-x">
+        <table class="data-table" id="minmax-table">
+          <thead>
+            <tr>
+              <th>Resource <span class="info-btn" data-tip="The resource scheduled.">i</span></th>
+              <th>Department <span class="info-btn" data-tip="The department requiring assignments.">i</span></th>
+              <th>Min Days <span class="info-btn" data-tip="The minimum number of days this specific resource must be assigned to this specific department during the planning period.">i</span></th>
+              <th>Max Days <span class="info-btn" data-tip="The maximum number of days this specific resource can be assigned to this specific department during the planning period.">i</span></th>
+            </tr>
+          </thead>
+          <tbody id="minmax-body"></tbody>
+        </table>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="App.prevStep()">← Back</button>
+        <button class="btn btn-generate" id="btn-generate" onclick="App.generate()">
+          <span class="btn-generate-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </span>
+          Generate Schedule
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── LOADING ────────────────────────────────────────────────────── -->
+    <div class="step-page" id="page-loading">
+      <div class="loading-center">
+        <div class="spinner"></div>
+        <h2>Solving Schedule…</h2>
+        <p id="loading-sub">Running constraint optimization. This may take a moment for large inputs.</p>
+        <div class="loading-steps">
+          <div class="load-step active" id="ls-1">Validating inputs</div>
+          <div class="load-step" id="ls-2">Building constraint model</div>
+          <div class="load-step" id="ls-3">Solving ILP</div>
+          <div class="load-step" id="ls-4">Generating alternates</div>
+          <div class="load-step" id="ls-5">Formatting results</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RESULTS ────────────────────────────────────────────────────── -->
+    <div class="step-page" id="page-results">
+      <div class="results-header">
+        <div class="results-status" id="results-status"></div>
+        <div class="results-actions">
+          <button class="btn btn-ghost btn-sm" onclick="App.goToStep(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+            Edit Inputs
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-dl-results" onclick="App.downloadExcel()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- Result tabs -->
+      <div class="result-tabs" id="result-tabs"></div>
+
+      <!-- Tab content -->
+      <div id="result-content"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════ TOAST NOTIFICATION ════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

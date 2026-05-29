@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TimetableAI — Smart Scheduling System</title>
+<meta name="description" content="Browser-based timetable &amp; appointment scheduler. No installation. Works entirely in your browser."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ══════════════ VARIABLES ══════════════════════════════════ */
+:root{
+  --bg:#080d1a;--bg2:#0f1629;--bgc:rgba(255,255,255,.04);--bgch:rgba(255,255,255,.07);
+  --bdr:rgba(255,255,255,.08);--bdrh:rgba(255,255,255,.18);
+  --blue:#3b82f6;--bglw:rgba(59,130,246,.22);--purp:#8b5cf6;--cyan:#06b6d4;
+  --ok:#10b981;--okbg:rgba(16,185,129,.12);
+  --wa:#f59e0b;--wabg:rgba(245,158,11,.12);
+  --er:#ef4444;--erbg:rgba(239,68,68,.12);
+  --t1:#f1f5f9;--t2:#94a3b8;--t3:#64748b;
+  --nh:64px;--sw:262px;--r:12px;--rs:8px;
+  --glow:0 0 0 1px rgba(59,130,246,.4),0 4px 20px rgba(59,130,246,.18);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+
+/* ══════════════ NAVBAR ══════════════════════════════════════ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:200;height:var(--nh);
+  background:rgba(8,13,26,.94);backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.nbrand{display:flex;align-items:center;gap:10px}
+.nicon{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),var(--purp));
+  border-radius:10px;display:flex;align-items:center;justify-content:center}
+.nicon svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2}
+.nname{font-size:18px;font-weight:800;letter-spacing:-.3px}
+.nbadge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  background:linear-gradient(135deg,var(--blue),var(--purp));padding:3px 9px;border-radius:20px;color:#fff}
+.nright{display:flex;align-items:center;gap:10px}
+.nstat{font-size:12px;color:var(--t3);padding:4px 10px;border-radius:20px;
+  background:var(--bgc);border:1px solid var(--bdr);transition:all .3s}
+.nstat.solving{color:var(--wa);border-color:rgba(245,158,11,.3)}
+.nstat.done{color:var(--ok);border-color:rgba(16,185,129,.3)}
+.ndl{display:none;align-items:center;gap:6px;padding:7px 15px;border-radius:var(--rs);
+  background:linear-gradient(135deg,var(--blue),var(--purp));color:#fff;
+  font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+.ndl:hover{transform:translateY(-1px);box-shadow:0 6px 16px var(--bglw)}
+
+/* ══════════════ LAYOUT ══════════════════════════════════════ */
+.wrap{display:flex;margin-top:var(--nh);min-height:calc(100vh - var(--nh))}
+
+/* ══════════════ SIDEBAR ══════════════════════════════════════ */
+.sb{width:var(--sw);background:var(--bg2);border-right:1px solid var(--bdr);
+  display:flex;flex-direction:column;padding:24px 14px;
+  position:sticky;top:var(--nh);height:calc(100vh - var(--nh));overflow-y:auto;flex-shrink:0}
+.sb-list{display:flex;flex-direction:column;flex:1}
+.si{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:var(--rs);cursor:pointer;transition:all .2s}
+.si:hover{background:var(--bgch)}
+.si.active{background:var(--bglw)}
+.si.done .sn{background:var(--ok);color:#fff;border-color:transparent;box-shadow:0 0 10px rgba(16,185,129,.35)}
+.sn{width:30px;height:30px;border-radius:50%;background:var(--bgc);border:1px solid var(--bdr);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  flex-shrink:0;color:var(--t3);transition:all .3s}
+.si.active .sn{background:linear-gradient(135deg,var(--blue),var(--purp));border-color:transparent;color:#fff;box-shadow:0 0 12px var(--bglw)}
+.si-info .si-lbl{font-size:13px;font-weight:600;color:var(--t1)}
+.si-info .si-sub{font-size:11px;color:var(--t3)}
+.si.active .si-lbl{color:#fff}
+.sconn{width:1px;height:18px;background:var(--bdr);margin-left:26px}
+.sb-tip{margin-top:auto;padding-top:16px;display:flex;gap:6px;font-size:11px;color:var(--t3);
+  line-height:1.5;background:var(--bgc);border:1px solid var(--bdr);padding:10px;border-radius:var(--rs)}
+
+/* ══════════════ MAIN ════════════════════════════════════════ */
+.main{flex:1;min-width:0;padding:28px 32px;overflow-y:auto}
+.sp{display:none;animation:fup .3s ease}
+.sp.active{display:block}
+@keyframes fup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* page header */
+.ph{margin-bottom:20px}
+.ph h1{font-size:24px;font-weight:800;letter-spacing:-.4px;margin-bottom:5px}
+.ph p{color:var(--t2);font-size:13.5px}
+
+/* ══════════════ CARD & FORM ═════════════════════════════════ */
+.card{background:var(--bgc);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:20px;margin-bottom:16px;backdrop-filter:blur(8px)}
+.card.p0{padding:0;overflow:hidden}
+.card.ox{overflow-x:auto}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.span2{grid-column:1/-1}
+.lbl{font-size:12px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
+.tip{font-weight:400;color:var(--t3);text-transform:none;letter-spacing:0}
+.req{color:var(--er)}
+input[type=text],input[type=number],input[type=date]{
+  background:rgba(255,255,255,.055);border:1px solid var(--bdr);border-radius:var(--rs);
+  padding:9px 13px;color:var(--t1);font-size:13.5px;font-family:inherit;width:100%;
+  transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;color-scheme:dark}
+input:focus{outline:none;border-color:var(--blue);box-shadow:var(--glow)}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+
+/* radio pills */
+.rpills{display:flex;gap:7px;flex-wrap:wrap}
+.rpill{display:flex;align-items:center;padding:7px 18px;border-radius:20px;
+  border:1px solid var(--bdr);background:var(--bgc);cursor:pointer;
+  font-size:13px;font-weight:600;transition:all .2s;user-select:none}
+.rpill input{display:none}
+.rpill:hover{border-color:var(--bdrh);background:var(--bgch)}
+.rpill:has(input:checked){background:var(--bglw);border-color:var(--blue);color:var(--blue)}
+
+/* step nav */
+.snav{display:flex;justify-content:space-between;align-items:center;padding-top:6px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:var(--rs);
+  font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .2s;border:none}
+.btn-pri{background:linear-gradient(135deg,var(--blue),var(--purp));color:#fff;box-shadow:0 4px 14px rgba(59,130,246,.28)}
+.btn-pri:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,130,246,.38)}
+.btn-ghost{background:var(--bgc);border:1px solid var(--bdr);color:var(--t2);font-family:inherit}
+.btn-ghost:hover{background:var(--bgch);border-color:var(--bdrh);color:var(--t1)}
+.btn-add{background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.4);color:var(--blue);
+  width:100%;justify-content:center;font-family:inherit;padding:11px;border-radius:var(--rs);
+  font-size:13.5px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-add:hover{background:rgba(59,130,246,.18);border-color:var(--blue)}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-xs{padding:4px 11px;font-size:11px;border-radius:6px;font-family:inherit;font-weight:600;cursor:pointer;border:none}
+.btn-gen{background:linear-gradient(135deg,#10b981,#059669);color:#fff;
+  padding:12px 28px;font-size:15px;box-shadow:0 4px 14px rgba(16,185,129,.32);font-family:inherit;border:none;
+  border-radius:var(--rs);display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.btn-gen:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(16,185,129,.48)}
+.btn-del{background:none;border:none;color:var(--t3);cursor:pointer;padding:4px 7px;border-radius:6px;
+  font-size:16px;font-family:inherit;transition:all .2s;line-height:1}
+.btn-del:hover{background:var(--erbg);color:var(--er)}
+
+/* ══════════════ DEPT CARDS ══════════════════════════════════ */
+.dept-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.dept-card{display:flex;align-items:center;gap:0;border-radius:var(--rs);
+  border:1px solid var(--bdr);overflow:hidden;background:var(--bgc);transition:border-color .2s}
+.dept-card:hover{border-color:var(--bdrh)}
+.dc-bar{width:5px;flex-shrink:0;align-self:stretch}
+.dc-body{display:flex;align-items:center;gap:10px;padding:10px 14px;flex:1;flex-wrap:wrap}
+.dc-label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.dc-body input[type=text]{min-width:180px;flex:1}
+.dc-body input[type=number]{width:90px;flex-shrink:0}
+.dc-row{display:flex;align-items:center;gap:6px}
+
+/* ══════════════ RESOURCE CARDS ══════════════════════════════ */
+.res-cards{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.res-card{border:1px solid var(--bdr);border-radius:var(--r);background:var(--bgc);
+  overflow:hidden;transition:border-color .2s}
+.res-card:hover{border-color:var(--bdrh)}
+.rc-top{display:flex;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--bdr)}
+.rc-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purp));
+  color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rc-top input[type=text]{min-width:160px;flex:1}
+.rc-top input[type=number]{width:82px}
+.rc-mid{padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:rgba(255,255,255,.02)}
+.rc-deptlbl{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.rc-chips{display:flex;gap:6px;flex-wrap:wrap}
+.dchip{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;
+  font-size:11px;font-weight:700;cursor:pointer;user-select:none;border:2px solid;
+  transition:all .2s;white-space:nowrap}
+.dchip.off{background:transparent;opacity:.5}
+.dchip.on{opacity:1}
+.rc-lbl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--t3);white-space:nowrap}
+
+/* ══════════════ ABSENCE CALENDAR ════════════════════════════ */
+.abs-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;
+  padding:12px 16px;background:var(--bgc);border:1px solid var(--bdr);border-radius:var(--rs)}
+.abs-ctrl-lbl{font-size:12px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-right:4px}
+.btn-sat{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .2s}
+.btn-sat:hover{background:rgba(239,68,68,.22)}
+.btn-sun{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--wa);
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .2s}
+.btn-sun:hover{background:rgba(245,158,11,.22)}
+.abs-sep{width:1px;height:24px;background:var(--bdr)}
+
+/* calendar */
+.cal-wrap{overflow-x:auto;overflow-y:auto;max-height:520px}
+.caltbl{border-collapse:collapse;font-size:11px}
+.caltbl th{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.05);
+  padding:3px 4px;font-size:9px;font-weight:700;color:var(--t3);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px}
+.caltbl th.mhdr{color:var(--blue);border-bottom:2px solid var(--blue);font-size:10px;text-align:center}
+.caltbl th.we-hdr{color:#f87171}
+.caltbl td.rn-cell{position:sticky;left:0;z-index:10;background:var(--bg2);
+  border-right:2px solid var(--bdr);padding:4px 12px;font-size:12px;font-weight:600;
+  white-space:nowrap;backdrop-filter:blur(4px)}
+.caltbl td.rn-cell .rc-action{margin-top:3px}
+.cc{width:26px;height:26px;text-align:center;cursor:pointer;
+  border:1px solid rgba(255,255,255,.04);transition:background .15s;vertical-align:middle}
+.cc:hover{border-color:var(--bdrh)}
+.cc.we-cell{background:rgba(239,68,68,.07)}
+.cc.absent{background:rgba(100,116,139,.42)}
+.cc.absent::after{content:'✕';font-size:8px;color:var(--t2);display:block;line-height:26px}
+.cc.avail{background:rgba(255,255,255,.025)}
+.cc.we-cell.absent{background:rgba(239,68,68,.38)}
+.dh{writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;line-height:24px;height:46px;display:block}
+
+/* range form */
+.range-row{background:rgba(59,130,246,.07);border-top:1px solid rgba(59,130,246,.2)}
+.range-form{display:flex;align-items:center;gap:8px;padding:6px 12px;flex-wrap:wrap}
+.range-form input[type=date]{width:130px;padding:5px 8px;font-size:12px}
+.range-sel{background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:var(--rs);
+  padding:6px 10px;color:var(--t1);font-size:12px;font-family:inherit;cursor:pointer}
+.range-sel option{background:#1a2035}
+
+/* calendar legend */
+.cal-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--t2)}
+.ld{width:12px;height:12px;border-radius:3px}
+.ld.we{background:rgba(239,68,68,.35);border:1px solid rgba(239,68,68,.5)}
+.ld.ab{background:rgba(100,116,139,.6)}
+.ld.av{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)}
+
+/* ══════════════ CONSTRAINTS TABLE ═══════════════════════════ */
+.ctbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ctbl th{text-align:left;padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.7px;color:var(--t3);background:rgba(255,255,255,.03);border-bottom:1px solid var(--bdr)}
+.ctbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.ctbl tbody tr:hover td{background:rgba(255,255,255,.025)}
+.ctbl input{width:70px}
+
+/* ══════════════ LOADING ════════════════════════════════════ */
+.lcenter{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:420px;gap:20px;text-align:center}
+.spinner{width:52px;height:52px;border-radius:50%;border:3px solid rgba(59,130,246,.18);
+  border-top-color:var(--blue);animation:spin .85s linear infinite;box-shadow:0 0 18px var(--bglw)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lcenter h2{font-size:22px;font-weight:700}
+.lcenter p{color:var(--t2);font-size:14px;max-width:380px}
+.lsteps{display:flex;flex-direction:column;gap:7px;background:var(--bgc);border:1px solid var(--bdr);
+  border-radius:var(--r);padding:14px 22px;text-align:left;width:300px}
+.ls{font-size:13px;color:var(--t3);padding-left:22px;position:relative;transition:color .3s}
+.ls::before{content:'○';position:absolute;left:0;font-size:10px;line-height:1.6}
+.ls.active{color:var(--blue);font-weight:600}
+.ls.active::before{content:'●';color:var(--blue)}
+.ls.done{color:var(--ok)}
+.ls.done::before{content:'✓';color:var(--ok)}
+
+/* ══════════════ RESULTS ════════════════════════════════════ */
+.rhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+.rst{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600}
+.bfeas{background:var(--okbg);color:var(--ok);border:1px solid rgba(16,185,129,.3);
+  padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700}
+.bwarn{background:var(--wabg);color:var(--wa);border:1px solid rgba(245,158,11,.3);
+  padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700}
+.ract{display:flex;gap:8px}
+.rtabs{display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--bdr);padding-bottom:0;margin-bottom:22px}
+.rtab{padding:8px 18px;border-radius:var(--rs) var(--rs) 0 0;background:var(--bgc);
+  border:1px solid var(--bdr);border-bottom:none;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .2s;color:var(--t2);margin-bottom:-1px}
+.rtab.active{background:var(--bglw);border-color:var(--blue);color:var(--blue);border-bottom-color:var(--bg)}
+.tbadge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;margin-left:4px}
+.tbadge.ok{background:var(--okbg);color:var(--ok)}
+.tbadge.er{background:var(--erbg);color:var(--er)}
+.rtp{display:none}
+.rtp.active{display:block}
+.srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:22px}
+.scard{background:var(--bgc);border:1px solid var(--bdr);border-radius:var(--r);padding:15px;transition:all .2s}
+.scard:hover{border-color:var(--bdrh)}
+.slbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3)}
+.sval{font-size:24px;font-weight:800;letter-spacing:-.4px;margin-top:3px}
+.ssub{font-size:11px;color:var(--t3);margin-top:2px}
+.stit{font-size:13px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.8px;
+  margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.stit::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.sw{overflow-x:auto;margin-bottom:22px}
+.stbl{border-collapse:collapse;font-size:11px}
+.stbl th{padding:3px 4px;text-align:center;font-size:8.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.3px;color:var(--t3);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.04)}
+.stbl th.mc{color:var(--cyan);border-bottom:2px solid var(--cyan);font-size:10px}
+.stbl td{border:1px solid rgba(255,255,255,.04)}
+.stbl td.rc{padding:3px 12px;font-size:12px;font-weight:600;white-space:nowrap;
+  background:rgba(255,255,255,.03);border-right:2px solid var(--bdr);
+  position:sticky;left:0;z-index:2;backdrop-filter:blur(4px)}
+.sdcell{width:26px;height:24px;text-align:center;font-size:7.5px;font-weight:700;vertical-align:middle}
+.sdcell.abs{background:rgba(100,116,139,.35);color:var(--t3)}
+.sdcell.wknd{background:rgba(239,68,68,.07)}
+.sdcell.una{background:rgba(255,255,255,.02);color:rgba(255,255,255,.12)}
+.smtbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
+.smtbl th{text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--t3);background:rgba(255,255,255,.03);border-bottom:1px solid var(--bdr)}
+.smtbl td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.03)}
+.smtbl tbody tr:hover td{background:rgba(255,255,255,.02)}
+.bok{background:var(--okbg);color:var(--ok);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.berr{background:var(--erbg);color:var(--er);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.pbw{background:rgba(255,255,255,.08);border-radius:4px;height:5px;min-width:80px;overflow:hidden;margin-top:3px}
+.pb{height:5px;border-radius:4px;transition:width .4s}
+.pb.ok{background:var(--ok)}
+.pb.er{background:var(--er)}
+.pb.bl{background:var(--blue)}
+.vtbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
+.vtbl th{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--t3);background:rgba(255,255,255,.03);border-bottom:1px solid var(--bdr);text-align:left}
+.vtbl td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.03)}
+.sh{color:var(--er);font-weight:700}.sm{color:var(--wa);font-weight:700}.sl{color:var(--ok);font-weight:700}
+.dchip-s{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
+
+/* ══════════════ TOAST ═══════════════════════════════════════ */
+.toast{position:fixed;bottom:22px;right:22px;z-index:9999;background:#1e293b;
+  border:1px solid var(--bdr);padding:11px 18px;border-radius:var(--rs);
+  font-size:13.5px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.4);
+  opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{border-color:var(--ok);color:var(--ok)}
+.toast.error{border-color:var(--er);color:var(--er)}
+
+/* ══════════════ RESPONSIVE ══════════════════════════════════ */
+@media(max-width:800px){
+  :root{--sw:0px}
+  .sb{display:none}
+  .main{padding:18px 14px}
+  .fg2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════ NAVBAR ══════════════════════════════════════ -->
+<nav class="nav">
+  <div class="nbrand">
+    <div class="nicon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+    <span class="nname">TimetableAI</span>
+    <span class="nbadge">Scheduler</span>
+  </div>
+  <div class="nright">
+    <span class="nstat" id="nStat">Ready</span>
+    <button class="ndl" id="btnDl" onclick="App.downloadExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Excel
+    </button>
+  </div>
+</nav>
+
+<!-- ════════════ APP ══════════════════════════════════════════ -->
+<div class="wrap">
+  <!-- Sidebar -->
+  <aside class="sb">
+    <div class="sb-list">
+      <div class="si active" id="si1" onclick="App.tryGoto(1)"><div class="sn">1</div><div class="si-info"><div class="si-lbl">Plan Period</div><div class="si-sub">Dates &amp; alternates</div></div></div>
+      <div class="sconn"></div>
+      <div class="si" id="si2" onclick="App.tryGoto(2)"><div class="sn">2</div><div class="si-info"><div class="si-lbl">Departments</div><div class="si-sub">Tasks / courses</div></div></div>
+      <div class="sconn"></div>
+      <div class="si" id="si3" onclick="App.tryGoto(3)"><div class="sn">3</div><div class="si-info"><div class="si-lbl">Resources</div><div class="si-sub">People &amp; dept mapping</div></div></div>
+      <div class="sconn"></div>
+      <div class="si" id="si4" onclick="App.tryGoto(4)"><div class="sn">4</div><div class="si-info"><div class="si-lbl">Absence Calendar</div><div class="si-sub">Days off &amp; ranges</div></div></div>
+      <div class="sconn"></div>
+      <div class="si" id="si5" onclick="App.tryGoto(5)"><div class="sn">5</div><div class="si-info"><div class="si-lbl">Day Constraints</div><div class="si-sub">Min / Max / Consecutive</div></div></div>
+    </div>
+    <div class="sb-tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Define departments first, then assign resources to them in Step 3.
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ── Step 1: Period ─────────────────────────────────── -->
+    <div class="sp active" id="page1">
+      <div class="ph"><h1>Plan Period</h1><p>Set the scheduling window and number of alternate schedules to generate.</p></div>
+      <div class="card">
+        <div class="fg2">
+          <div class="fg"><label class="lbl" for="cfgS">Start Date</label><input type="date" id="cfgS"/></div>
+          <div class="fg"><label class="lbl" for="cfgE">End Date</label><input type="date" id="cfgE"/></div>
+          <div class="fg span2">
+            <label class="lbl">Max Alternate Schedules to Generate</label>
+            <div class="rpills">
+              <label class="rpill"><input type="radio" name="malt" value="0"> None</label>
+              <label class="rpill"><input type="radio" name="malt" value="1"> 1</label>
+              <label class="rpill"><input type="radio" name="malt" value="2"> 2</label>
+              <label class="rpill"><input type="radio" name="malt" value="3" checked> 3</label>
+              <label class="rpill"><input type="radio" name="malt" value="5"> 5</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="snav"><span></span><button class="btn btn-pri" onclick="App.next()">Next: Departments →</button></div>
+    </div>
+
+    <!-- ── Step 2: Departments ────────────────────────────── -->
+    <div class="sp" id="page2">
+      <div class="ph"><h1>Departments</h1><p>Add every department, task, or course. Set minimum and maximum total coverage hours for the plan period.</p></div>
+      <div class="dept-cards" id="deptCards"></div>
+      <button class="btn-add" onclick="App.addDept()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Department
+      </button>
+      <div class="snav" style="margin-top:20px">
+        <button class="btn btn-ghost" onclick="App.prev()">← Back</button>
+        <button class="btn btn-pri" onclick="App.next()">Next: Resources →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Resources ──────────────────────────────── -->
+    <div class="sp" id="page3">
+      <div class="ph"><h1>Resources</h1><p>Add each person. Set their work hours and select which departments they can be assigned to.</p></div>
+      <div class="res-cards" id="resCards"></div>
+      <button class="btn-add" onclick="App.addRes()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Resource
+      </button>
+      <div class="snav" style="margin-top:20px">
+        <button class="btn btn-ghost" onclick="App.prev()">← Back</button>
+        <button class="btn btn-pri" onclick="App.next()">Next: Absence Calendar →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 4: Absence ────────────────────────────────── -->
+    <div class="sp" id="page4">
+      <div class="ph">
+        <h1>Absence Calendar</h1>
+        <p>Mark days when each resource is <strong>absent</strong>. Click any cell, use bulk buttons, or add a date range per resource.</p>
+        <div class="cal-legend" style="margin-top:8px">
+          <span class="leg"><span class="ld we"></span> Weekend (pre-absent)</span>
+          <span class="leg"><span class="ld ab"></span> Absent</span>
+          <span class="leg"><span class="ld av"></span> Available</span>
+        </div>
+      </div>
+      <!-- Bulk controls -->
+      <div class="abs-controls">
+        <span class="abs-ctrl-lbl">Bulk:</span>
+        <button class="btn-sat" onclick="App.bulkDay(6,'absent')" title="Mark all Saturdays absent">📅 All Saturdays → Absent</button>
+        <button class="btn-sat" onclick="App.bulkDay(6,'avail')" title="Restore all Saturdays">↩ Restore Saturdays</button>
+        <div class="abs-sep"></div>
+        <button class="btn-sun" onclick="App.bulkDay(0,'absent')" title="Mark all Sundays absent">📅 All Sundays → Absent</button>
+        <button class="btn-sun" onclick="App.bulkDay(0,'avail')" title="Restore all Sundays">↩ Restore Sundays</button>
+        <div class="abs-sep"></div>
+        <button class="btn-xs btn-ghost" onclick="App.bulkAll('absent')">Mark All Absent</button>
+        <button class="btn-xs btn-ghost" onclick="App.bulkAll('avail')">Clear All</button>
+      </div>
+      <div class="card p0"><div class="cal-wrap" id="calWrap"></div></div>
+      <div class="snav">
+        <button class="btn btn-ghost" onclick="App.prev()">← Back</button>
+        <button class="btn btn-pri" onclick="App.next()">Next: Day Constraints →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 5: Constraints ────────────────────────────── -->
+    <div class="sp" id="page5">
+      <div class="ph">
+        <h1>Day Constraints</h1>
+        <p>Set minimum / maximum days and <strong>minimum consecutive days</strong> each resource must work in each department. Leave at 0 / 999 for no constraint.</p>
+      </div>
+      <div class="card ox">
+        <table class="ctbl">
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Department</th>
+              <th>Min Days</th>
+              <th>Max Days</th>
+              <th>Min Consecutive Days <span style="font-size:10px;font-weight:400;color:var(--t3)">(keeps blocks together)</span></th>
+            </tr>
+          </thead>
+          <tbody id="cTbody"></tbody>
+        </table>
+      </div>
+      <div class="snav">
+        <button class="btn btn-ghost" onclick="App.prev()">← Back</button>
+        <button class="btn-gen" onclick="App.generate()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="17" height="17"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Generate Schedule
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Loading ────────────────────────────────────────── -->
+    <div class="sp" id="pageLoad">
+      <div class="lcenter">
+        <div class="spinner"></div>
+        <h2>Solving Schedule…</h2>
+        <p>Running constraint optimisation with greedy assignment and local-search repair.</p>
+        <div class="lsteps">
+          <div class="ls" id="ls1">Validating inputs</div>
+          <div class="ls" id="ls2">Building constraint model</div>
+          <div class="ls" id="ls3">Greedy priority assignment</div>
+          <div class="ls" id="ls4">Local-search repair</div>
+          <div class="ls" id="ls5">Consecutive blocks enforcement</div>
+          <div class="ls" id="ls6">Generating alternates</div>
+          <div class="ls" id="ls7">Formatting results</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Results ────────────────────────────────────────── -->
+    <div class="sp" id="pageRes">
+      <div class="rhdr">
+        <div class="rst" id="resStatus"></div>
+        <div class="ract">
+          <button class="btn btn-ghost btn-sm" onclick="App.goto(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="15 18 9 12 15 6"/></svg>
+            Edit Inputs
+          </button>
+          <button class="btn btn-pri btn-sm" onclick="App.downloadExcel()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Excel
+          </button>
+        </div>
+      </div>
+      <div class="rtabs" id="resTabs"></div>
+      <div id="resContent"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+'use strict';
+
+/* ═══════════ COLOUR PALETTE ════════════════════════════════ */
+const DC  = ['#3b82f6','#f97316','#22c55e','#eab308','#a855f7','#06b6d4','#ef4444','#14b8a6','#f43f5e','#8b5cf6','#0ea5e9','#84cc16'];
+const DCT = ['#fff','#111','#111','#111','#fff','#111','#fff','#111','#fff','#fff','#fff','#111'];
+const dc  = i => DC[i % DC.length];
+const dct = i => DCT[i % DCT.length];
+
+/* ═══════════ SOLVER ════════════════════════════════════════ */
+class TimetableSolver {
+
+  solve({ resources, departments, dates, absence, mapping, deptMinMax, consecDays, maxAlternates }) {
+    const results = [];
+    const seen    = new Set();
+    for (let seed = 0; seed < Math.max(maxAlternates * 6, 18) && results.length <= maxAlternates; seed++) {
+      const r = this._run(resources, departments, dates, absence, mapping, deptMinMax, consecDays, seed);
+      const k = this._hash(r.assignment, resources, dates);
+      if (!seen.has(k)) {
+        seen.add(k);
+        r.index = results.length;
+        r.label = results.length === 0 ? 'Schedule' : `Alt ${results.length}`;
+        results.push(r);
+      }
+    }
+    return results;
+  }
+
+  _run(resources, departments, dates, absence, mapping, deptMinMax, consecDays, seed) {
+    const rdD  = {}; // rname → dname → days
+    const dHrs = {}; // dname → hours
+    const rD   = {}; // rname → days
+    resources.forEach(r => { rdD[r.name] = {}; rD[r.name] = 0; departments.forEach(d => rdD[r.name][d.name] = 0); });
+    departments.forEach(d => dHrs[d.name] = 0);
+    const asgn = {}; // rname → date → dname
+    resources.forEach(r => asgn[r.name] = {});
+
+    /* ── Phase 1: priority greedy (process dates in order for consecutive) */
+    for (const date of dates) {
+      const avail = this._shuf(resources.filter(r => !absence[r.name]?.[date]), seed ^ (date.charCodeAt(8) || 0));
+      for (const res of avail) {
+        if (rD[res.name] * res.daily_hours >= res.max_hours) continue;
+        const feas = departments.filter(d => {
+          if (!mapping[res.name]?.[d.name]) return false;
+          const mm = deptMinMax[res.name]?.[d.name] || { min: 0, max: 9999 };
+          return rdD[res.name][d.name] < mm.max;
+        });
+        if (!feas.length) continue;
+
+        const prevDate = dates[dates.indexOf(date) - 1];
+        const prevDept = prevDate ? asgn[res.name][prevDate] : null;
+
+        let best = null, bestScore = -Infinity;
+        for (const d of feas) {
+          const dGap   = Math.max(0, d.min_hours - dHrs[d.name]);
+          const mm      = deptMinMax[res.name]?.[d.name] || { min: 0, max: 9999 };
+          const rGap    = Math.max(0, mm.min - rdD[res.name][d.name]);
+          const consec  = consecDays[res.name]?.[d.name] ?? 1;
+          const cBonus  = prevDept === d.name ? consec * 7 : 0;
+          const noise   = this._rand(seed, res.name + d.name + date) * 1.8;
+          const score   = dGap + rGap * 9 + cBonus + noise;
+          if (score > bestScore) { bestScore = score; best = d; }
+        }
+        if (!best) continue;
+        asgn[res.name][date] = best.name;
+        rdD[res.name][best.name]++;
+        rD[res.name]++;
+        dHrs[best.name] += res.daily_hours;
+      }
+    }
+
+    /* ── Phase 2: repair (fill unmet mins) */
+    for (let iter = 0; iter < Math.min(2500, resources.length * dates.length); iter++) {
+      let improved = false;
+      for (const res of resources) {
+        if (rD[res.name] * res.daily_hours >= res.min_hours) continue;
+        const unassigned = dates.filter(dt => !absence[res.name]?.[dt] && !asgn[res.name][dt]
+          && rD[res.name] * res.daily_hours < res.max_hours);
+        for (const dt of unassigned) {
+          const feas = departments.filter(d => {
+            if (!mapping[res.name]?.[d.name]) return false;
+            const mm = deptMinMax[res.name]?.[d.name] || { min: 0, max: 9999 };
+            return rdD[res.name][d.name] < mm.max;
+          });
+          if (!feas.length) continue;
+          const best = feas.reduce((b, d) => {
+            const s = Math.max(0, d.min_hours - dHrs[d.name]);
+            return s > (b?.s ?? -1) ? { d, s } : b;
+          }, null);
+          if (!best) continue;
+          asgn[res.name][dt] = best.d.name;
+          rdD[res.name][best.d.name]++;
+          rD[res.name]++;
+          dHrs[best.d.name] += res.daily_hours;
+          improved = true;
+        }
+      }
+      for (const dept of departments) {
+        if (dHrs[dept.name] >= dept.min_hours) continue;
+        for (const res of resources) {
+          if (!mapping[res.name]?.[dept.name]) continue;
+          if (rD[res.name] * res.daily_hours >= res.max_hours) continue;
+          const mm = deptMinMax[res.name]?.[dept.name] || { min: 0, max: 9999 };
+          if (rdD[res.name][dept.name] >= mm.max) continue;
+          const unassigned = dates.filter(dt => !absence[res.name]?.[dt] && !asgn[res.name][dt]);
+          for (const dt of unassigned.slice(0, 5)) {
+            asgn[res.name][dt] = dept.name;
+            rdD[res.name][dept.name]++;
+            rD[res.name]++;
+            dHrs[dept.name] += res.daily_hours;
+            improved = true;
+            if (dHrs[dept.name] >= dept.min_hours) break;
+          }
+          if (dHrs[dept.name] >= dept.min_hours) break;
+        }
+      }
+      if (!improved) break;
+    }
+
+    /* ── Phase 3: consecutive blocks enforcement */
+    resources.forEach(res => {
+      departments.forEach(dept => {
+        const minC = consecDays[res.name]?.[dept.name] ?? 1;
+        if (minC <= 1) return;
+        if (!mapping[res.name]?.[dept.name]) return;
+        this._enforceConsec(asgn, res, dept, minC, dates, absence, rdD, dHrs, rD);
+      });
+    });
+
+    /* ── Final assignment (add absent markers) */
+    const finalA = {};
+    resources.forEach(r => {
+      finalA[r.name] = {};
+      dates.forEach(dt => {
+        finalA[r.name][dt] = absence[r.name]?.[dt] ? '__absent__' : (asgn[r.name][dt] || null);
+      });
+    });
+
+    const violations = this._violations(resources, departments, dates, absence, mapping, deptMinMax, consecDays, rdD, dHrs, rD, asgn);
+    const summary    = this._summary(resources, departments, dates, absence, rdD, dHrs, rD);
+    return { assignment: finalA, violations, is_feasible: violations.length === 0, summary };
+  }
+
+  _enforceConsec(asgn, res, dept, minC, dates, absence, rdD, dHrs, rD) {
+    // Find runs of consecutive assignments for this resource-dept pair
+    const rname = res.name, dname = dept.name;
+    for (let i = 0; i < dates.length; i++) {
+      if (asgn[rname][dates[i]] !== dname) continue;
+      // Found start of a run
+      let runEnd = i;
+      while (runEnd + 1 < dates.length && asgn[rname][dates[runEnd + 1]] === dname) runEnd++;
+      const runLen = runEnd - i + 1;
+      if (runLen >= minC) { i = runEnd; continue; }
+
+      // Short run — try to extend it by converting adjacent unassigned days
+      // Extend forward
+      let ext = runEnd + 1;
+      while (ext < dates.length && runEnd - i + 1 < minC) {
+        const dt = dates[ext];
+        if (absence[rname]?.[dt]) { i = runEnd; break; }
+        if (!asgn[rname][dt] && rD[rname] * res.daily_hours < res.max_hours) {
+          const mm = {}; // no max check for consecutive repair (conservative)
+          asgn[rname][dt] = dname;
+          rdD[rname][dname]++;
+          rD[rname]++;
+          dHrs[dname] += res.daily_hours;
+          runEnd = ext;
+        } else { break; }
+        ext++;
+      }
+      i = runEnd;
+    }
+  }
+
+  _violations(resources, departments, dates, absence, mapping, deptMinMax, consecDays, rdD, dHrs, rD, asgn) {
+    const v = []; let id = 1;
+    const vid = () => `V${String(id++).padStart(3,'0')}`;
+
+    resources.forEach(r => {
+      const hrs = rD[r.name] * r.daily_hours;
+      if (hrs < r.min_hours) v.push({ violation_id: vid(), vtype: 'Resource Min Hours',
+        resource: r.name, department: '-', date: '-',
+        details: `${r.name}: ${hrs}h < ${r.min_hours}h minimum (shortfall: ${r.min_hours-hrs}h)`, severity: 'High' });
+      departments.forEach(d => {
+        if (!mapping[r.name]?.[d.name]) return;
+        const mm = deptMinMax[r.name]?.[d.name] || { min:0, max:9999 };
+        const days = rdD[r.name][d.name];
+        if (days < mm.min) v.push({ violation_id: vid(), vtype: 'Resource-Dept Min Days',
+          resource: r.name, department: d.name, date: '-',
+          details: `${r.name} → ${d.name}: ${days} days < ${mm.min} minimum`, severity: 'Medium' });
+        if (days > mm.max) v.push({ violation_id: vid(), vtype: 'Resource-Dept Max Days',
+          resource: r.name, department: d.name, date: '-',
+          details: `${r.name} → ${d.name}: ${days} days > ${mm.max} maximum`, severity: 'Low' });
+        // Consecutive check
+        const minC = consecDays[r.name]?.[d.name] ?? 1;
+        if (minC > 1) {
+          const dDates = dates.filter(dt => asgn[r.name]?.[dt] === d.name);
+          const runs = this._runs(dDates, dates);
+          const shortRuns = runs.filter(run => run.length > 0 && run.length < minC);
+          if (shortRuns.length) v.push({ violation_id: vid(), vtype: 'Consecutive Days',
+            resource: r.name, department: d.name, date: '-',
+            details: `${r.name} → ${d.name}: ${shortRuns.length} block(s) shorter than ${minC}-day minimum`, severity: 'Medium' });
+        }
+      });
+    });
+    departments.forEach(d => {
+      if (dHrs[d.name] < d.min_hours) v.push({ violation_id: vid(), vtype: 'Dept Min Hours',
+        resource: '-', department: d.name, date: '-',
+        details: `${d.name}: ${dHrs[d.name]}h < ${d.min_hours}h minimum (shortfall: ${d.min_hours-dHrs[d.name]}h)`, severity: 'High' });
+    });
+    return v;
+  }
+
+  _runs(dDates, allDates) {
+    if (!dDates.length) return [];
+    const runs = []; let cur = [dDates[0]];
+    for (let i = 1; i < dDates.length; i++) {
+      const prevIdx = allDates.indexOf(dDates[i-1]);
+      const curIdx  = allDates.indexOf(dDates[i]);
+      if (curIdx === prevIdx + 1) cur.push(dDates[i]);
+      else { runs.push(cur); cur = [dDates[i]]; }
+    }
+    runs.push(cur);
+    return runs;
+  }
+
+  _summary(resources, departments, dates, absence, rdD, dHrs, rD) {
+    return {
+      resources: resources.map(r => ({
+        name: r.name, total_days: rD[r.name], total_hours: rD[r.name]*r.daily_hours,
+        min_hours: r.min_hours, max_hours: r.max_hours,
+        absent_days: dates.filter(dt => absence[r.name]?.[dt]).length,
+        dept_days: Object.fromEntries(departments.map(d => [d.name, rdD[r.name][d.name]])),
+        hours_ok: r.min_hours <= rD[r.name]*r.daily_hours && rD[r.name]*r.daily_hours <= r.max_hours,
+      })),
+      departments: departments.map(d => ({
+        name: d.name, total_hours: dHrs[d.name],
+        min_hours: d.min_hours, max_hours: d.max_hours,
+        ok: d.min_hours <= dHrs[d.name] && dHrs[d.name] <= d.max_hours,
+      })),
+    };
+  }
+
+  _shuf(a, seed) {
+    const r = [...a]; let s = (seed*1664525+1013904223)>>>0;
+    for (let i=r.length-1;i>0;i--){s=(s*1664525+1013904223)>>>0;const j=s%(i+1);[r[i],r[j]]=[r[j],r[i]];}
+    return r;
+  }
+  _rand(seed, key) {
+    let h=seed; for(let i=0;i<key.length;i++) h=((h<<5)-h+key.charCodeAt(i))|0;
+    return((h>>>0)/0xFFFFFFFF);
+  }
+  _hash(asgn, resources, dates) {
+    const p=[]; resources.slice(0,4).forEach(r=>dates.slice(0,14).forEach(d=>p.push(asgn[r.name]?.[d]||'')));
+    return p.join('|');
+  }
+}
+
+/* ═══════════ EXCEL EXPORTER ════════════════════════════════ */
+class ExcelExporter {
+  export(results, meta) {
+    const wb = XLSX.utils.book_new();
+    const { departments, resources, dates } = meta;
+
+    // Index
+    const idx = [['TimetableAI — Schedule Export'],[], ['Sheet','Status','Violations','Note']];
+    results.forEach(r => idx.push([r.label, r.is_feasible?'Feasible':'Violations', r.violations.length, r.index===0?'Primary':'Alternate']));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(idx), 'Index');
+
+    // Violations
+    const allV = results.flatMap(r => r.violations);
+    if (allV.length) {
+      const vd = [['ID','Type','Resource','Department','Details','Severity']];
+      allV.forEach(v => vd.push([v.violation_id,v.vtype,v.resource,v.department,v.details,v.severity]));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vd), 'Violations');
+    }
+
+    results.forEach(result => {
+      const lbl = result.label.replace(' ','_');
+      // Schedule
+      const sd = [['Resource',...dates]];
+      resources.forEach(res => sd.push([res.name,...dates.map(dt => {
+        const v = result.assignment[res.name]?.[dt];
+        return v==='__absent__'?'Absent':(v||'');
+      })]));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sd), lbl);
+      // Summary
+      const sumd = [['Resource','Work Days','Work Hours','Min Hours','Max Hours','Absent Days',...departments.map(d=>`Days:${d.name}`),'Status']];
+      result.summary.resources.forEach(r => sumd.push([r.name,r.total_days,r.total_hours,r.min_hours,r.max_hours,r.absent_days,...departments.map(d=>r.dept_days[d.name]??0),r.hours_ok?'OK':'VIOLATION']));
+      sumd.push([],['Dept','Total Hours','Min Hours','Max Hours','Status']);
+      result.summary.departments.forEach(d => sumd.push([d.name,d.total_hours,d.min_hours,d.max_hours>=9999?'No limit':d.max_hours,d.ok?'OK':'VIOLATION']));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumd), `Summary_${lbl}`);
+    });
+
+    XLSX.writeFile(wb, `schedule_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+}
+
+/* ═══════════ APP ════════════════════════════════════════════ */
+const App = {
+  step: 1,
+  results: null,
+  meta: null,
+  solver: new TimetableSolver(),
+  exporter: new ExcelExporter(),
+  deptCount: 0,  // monotonic id for depts
+  resCount: 0,   // monotonic id for resources
+
+  /* ── Init ──────────────────────────────────────────────── */
+  init() {
+    const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+    const p=n=>String(n).padStart(2,'0');
+    document.getElementById('cfgS').value=`${y}-${p(m+1)}-01`;
+    const last=new Date(y,m+1,0);
+    document.getElementById('cfgE').value=`${y}-${p(m+1)}-${p(last.getDate())}`;
+    // Start with 1 dept and 1 resource
+    this.addDept('Cardiology');
+    this.addDept('Neurology');
+    this.addRes('Dr. Smith');
+    this.goto(1);
+  },
+
+  /* ── Navigation ────────────────────────────────────────── */
+  goto(n) {
+    document.querySelectorAll('.sp').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.si').forEach((si,i) => {
+      si.classList.remove('active');
+      si.classList.toggle('done', i < n-1);
+    });
+    const page = document.getElementById(`page${n}`);
+    if (page) page.classList.add('active');
+    const si = document.getElementById(`si${n}`);
+    if (si) si.classList.add('active');
+    this.step = n;
+    this._build(n);
+    window.scrollTo({top:0,behavior:'smooth'});
+  },
+  tryGoto(n) { if(n<=this.step) this.goto(n); },
+  next()  { if(this._valid(this.step)) this.goto(this.step+1); },
+  prev()  { if(this.step>1) this.goto(this.step-1); },
+
+  _build(n) {
+    if (n===3) this._rebuildResChips();
+    if (n===4) this._buildCalendar();
+    if (n===5) this._buildConstraints();
+  },
+
+  /* ── Validation ────────────────────────────────────────── */
+  _valid(n) {
+    if (n===1) {
+      const s=document.getElementById('cfgS').value, e=document.getElementById('cfgE').value;
+      if(!s||!e){this._toast('Please enter start and end dates','error');return false;}
+      if(e<s){this._toast('End date must be after start date','error');return false;}
+    }
+    if (n===2) {
+      const names=[...document.querySelectorAll('.dc-name')].map(i=>i.value.trim());
+      if(!names.length){this._toast('Add at least one department','error');return false;}
+      if(names.some(n=>!n)){this._toast('All department names are required','error');return false;}
+      if(new Set(names).size!==names.length){this._toast('Department names must be unique','error');return false;}
+    }
+    if (n===3) {
+      const names=[...document.querySelectorAll('.rc-name')].map(i=>i.value.trim());
+      if(!names.length){this._toast('Add at least one resource','error');return false;}
+      if(names.some(n=>!n)){this._toast('All resource names are required','error');return false;}
+      if(new Set(names).size!==names.length){this._toast('Resource names must be unique','error');return false;}
+    }
+    return true;
+  },
+
+  /* ════════════════════════════════════════════════════════
+     STEP 2 — DEPARTMENTS
+  ════════════════════════════════════════════════════════ */
+  addDept(name='') {
+    const idx = this.deptCount++;
+    const color = dc(idx);
+    const card = document.createElement('div');
+    card.className = 'dept-card';
+    card.id = `dc${idx}`;
+    card.dataset.idx = idx;
+    card.dataset.color = color;
+    card.innerHTML = `
+      <div class="dc-bar" style="background:${color}"></div>
+      <div class="dc-body">
+        <input type="text" class="dc-name" placeholder="e.g. Cardiology" value="${name}" style="flex:1;min-width:160px"/>
+        <div class="dc-row"><span class="dc-label">Min Hours</span><input type="number" class="dc-minh" value="100" min="0" style="width:85px"/></div>
+        <div class="dc-row"><span class="dc-label">Max Hours</span><input type="number" class="dc-maxh" value="9999" min="0" style="width:85px"/></div>
+        <button class="btn-del" onclick="App.removeDept(${idx})" title="Remove department">✕</button>
+      </div>`;
+    document.getElementById('deptCards').appendChild(card);
+    // Update dept chips on all resource cards
+    this._rebuildResChips();
+  },
+
+  removeDept(idx) {
+    const el = document.getElementById(`dc${idx}`);
+    if (el) el.remove();
+    this._rebuildResChips();
+  },
+
+  /* ════════════════════════════════════════════════════════
+     STEP 3 — RESOURCES
+  ════════════════════════════════════════════════════════ */
+  addRes(name='') {
+    const idx = this.resCount++;
+    const card = document.createElement('div');
+    card.className = 'res-card';
+    card.id = `rc${idx}`;
+    card.dataset.idx = idx;
+    card.innerHTML = `
+      <div class="rc-top">
+        <div class="rc-num">${idx+1}</div>
+        <input type="text" class="rc-name" placeholder="e.g. Dr. Smith" value="${name}" style="flex:1;min-width:160px"/>
+        <span class="rc-lbl">Daily<input type="number" class="rc-daily" value="8" min="1" max="24" style="width:56px;margin-left:5px"/><span style="color:var(--t3)">h</span></span>
+        <span class="rc-lbl">Min<input type="number" class="rc-minh" value="80" min="0" style="width:72px;margin-left:5px"/><span style="color:var(--t3)">h</span></span>
+        <span class="rc-lbl">Max<input type="number" class="rc-maxh" value="176" min="0" style="width:72px;margin-left:5px"/><span style="color:var(--t3)">h</span></span>
+        <button class="btn-del" onclick="App.removeRes(${idx})" title="Remove resource">✕</button>
+      </div>
+      <div class="rc-mid">
+        <span class="rc-deptlbl">Works in:</span>
+        <div class="rc-chips" id="rchips${idx}"></div>
+      </div>`;
+    document.getElementById('resCards').appendChild(card);
+    this._buildChipsFor(idx, []);
+    this._renumberRes();
+  },
+
+  removeRes(idx) {
+    const el = document.getElementById(`rc${idx}`);
+    if (el) el.remove();
+    this._renumberRes();
+  },
+
+  _renumberRes() {
+    document.querySelectorAll('.res-card').forEach((card, i) => {
+      const num = card.querySelector('.rc-num');
+      if (num) num.textContent = i+1;
+    });
+  },
+
+  _rebuildResChips() {
+    document.querySelectorAll('.res-card').forEach(card => {
+      const idx = card.dataset.idx;
+      const chips = card.querySelector(`.rc-chips`);
+      if (!chips) return;
+      // Save current selections
+      const selected = new Set([...chips.querySelectorAll('.dchip.on')].map(c=>c.dataset.dname));
+      // Rebuild
+      this._buildChipsFor(idx, selected);
+    });
+  },
+
+  _buildChipsFor(rcIdx, selectedNames) {
+    const chipsEl = document.getElementById(`rchips${rcIdx}`);
+    if (!chipsEl) return;
+    chipsEl.innerHTML = '';
+    const deptCards = document.querySelectorAll('.dept-card');
+    if (!deptCards.length) {
+      chipsEl.innerHTML = '<span style="font-size:12px;color:var(--t3);font-style:italic">Add departments first</span>';
+      return;
+    }
+    deptCards.forEach(dc => {
+      const dname = dc.querySelector('.dc-name')?.value.trim() || `Dept ${dc.dataset.idx}`;
+      const color = dc.dataset.color || '#3b82f6';
+      const isOn  = selectedNames instanceof Set ? selectedNames.has(dname) : true; // default all on
+      const chip  = document.createElement('span');
+      chip.className = `dchip ${isOn?'on':'off'}`;
+      chip.dataset.dname = dname;
+      chip.style.borderColor = color;
+      if (isOn) chip.style.background = color;
+      chip.style.color = isOn ? (dct(Array.from(document.querySelectorAll('.dept-card')).indexOf(dc))) : color;
+      chip.textContent = dname;
+      chip.addEventListener('click', () => {
+        const on = chip.classList.toggle('on');
+        chip.classList.toggle('off', !on);
+        chip.style.background = on ? color : 'transparent';
+        chip.style.color = on ? dct(Array.from(document.querySelectorAll('.dept-card')).indexOf(dc)) : color;
+      });
+      chipsEl.appendChild(chip);
+    });
+  },
+
+  /* ════════════════════════════════════════════════════════
+     STEP 4 — ABSENCE CALENDAR
+  ════════════════════════════════════════════════════════ */
+  _buildCalendar() {
+    const start = new Date(document.getElementById('cfgS').value+'T00:00:00');
+    const end   = new Date(document.getElementById('cfgE').value+'T00:00:00');
+    const rnames= this._getResNames();
+    const wrap  = document.getElementById('calWrap');
+
+    // Save existing absence state
+    const prev = {};
+    wrap.querySelectorAll('.cc').forEach(c => prev[c.dataset.key] = c.dataset.absent==='1');
+
+    wrap.innerHTML = '';
+    if (!rnames.length) { wrap.innerHTML = '<p style="padding:20px;color:var(--t2)">Add resources in Step 3 first.</p>'; return; }
+
+    const dates = [];
+    for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) dates.push(new Date(d));
+
+    // Month groups for header
+    const months = {};
+    dates.forEach(d => { const mk=d.toISOString().slice(0,7); months[mk]=(months[mk]||0)+1; });
+
+    const tbl = document.createElement('table');
+    tbl.className = 'caltbl';
+
+    // Month header
+    const mRow = document.createElement('tr');
+    mRow.innerHTML = '<th style="min-width:170px;text-align:left;position:sticky;left:0;background:var(--bg2);z-index:11">Resource</th>';
+    Object.entries(months).forEach(([mk,cnt]) => {
+      const th=document.createElement('th'); th.colSpan=cnt; th.className='mhdr';
+      th.textContent=new Date(mk+'-01').toLocaleString('default',{month:'long',year:'numeric'});
+      mRow.appendChild(th);
+    });
+    tbl.appendChild(mRow);
+
+    // Day header
+    const dRow = document.createElement('tr');
+    dRow.innerHTML = '<th style="position:sticky;left:0;background:var(--bg2);z-index:11"></th>';
+    dates.forEach(d => {
+      const th=document.createElement('th');
+      const isWE=d.getDay()===0||d.getDay()===6;
+      if(isWE) th.className='we-hdr';
+      const sp=document.createElement('span'); sp.className='dh';
+      sp.textContent=`${['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()]} ${d.getDate()}`;
+      th.appendChild(sp); dRow.appendChild(th);
+    });
+    tbl.appendChild(dRow);
+
+    // Resource rows
+    rnames.forEach(rname => {
+      // Main row
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.className = 'rn-cell';
+      nameTd.style.verticalAlign = 'top';
+
+      // Name + range button in one cell
+      nameTd.innerHTML = `<div style="font-weight:600;margin-bottom:3px">${rname}</div>
+        <button class="btn-xs btn-ghost" style="white-space:nowrap;font-size:10px"
+          onclick="App.toggleRange('${rname.replace(/'/g,"\\'")}',this)">📅 Add Range</button>`;
+      tr.appendChild(nameTd);
+
+      dates.forEach(d => {
+        const isWE = d.getDay()===0||d.getDay()===6;
+        const diso = d.toISOString().slice(0,10);
+        const key  = `${rname}|${diso}`;
+        const isAb = prev[key]!==undefined ? prev[key] : isWE;
+        const td   = document.createElement('td');
+        td.className = 'cc'+(isWE?' we-cell':'')+(isAb?' absent':' avail');
+        td.dataset.key=key; td.dataset.rname=rname;
+        td.dataset.date=diso; td.dataset.dow=String(d.getDay());
+        td.dataset.absent=isAb?'1':'0';
+        td.title=`${rname} — ${diso}`;
+        td.addEventListener('click', () => {
+          const ab=td.dataset.absent==='1'; const now=!ab;
+          td.dataset.absent=now?'1':'0';
+          td.classList.toggle('absent',now); td.classList.toggle('avail',!now);
+        });
+        tr.appendChild(td);
+      });
+      tbl.appendChild(tr);
+
+      // Range form row (hidden by default)
+      const rfTr = document.createElement('tr');
+      rfTr.id = `rf-${rname.replace(/\s+/g,'_')}`;
+      rfTr.className = 'range-row';
+      rfTr.style.display = 'none';
+      const rfTd = document.createElement('td');
+      rfTd.colSpan = dates.length + 1;
+      rfTd.style.padding = '0';
+      rfTd.innerHTML = `
+        <div class="range-form">
+          <span style="font-size:11px;font-weight:700;color:var(--t2)">Range for ${rname}:</span>
+          <input type="date" id="rf-from-${rname.replace(/\s+/g,'_')}" style="width:130px;padding:5px 8px;font-size:12px"/>
+          <span style="color:var(--t3);font-size:12px">to</span>
+          <input type="date" id="rf-to-${rname.replace(/\s+/g,'_')}" style="width:130px;padding:5px 8px;font-size:12px"/>
+          <select class="range-sel" id="rf-type-${rname.replace(/\s+/g,'_')}">
+            <option value="absent">Mark Absent</option>
+            <option value="avail">Mark Available</option>
+          </select>
+          <button class="btn btn-pri btn-sm" onclick="App.applyRange('${rname.replace(/'/g,"\\'")}')">Apply</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.toggleRange('${rname.replace(/'/g,"\\'")}',null)">Cancel</button>
+        </div>`;
+      rfTr.appendChild(rfTd);
+      tbl.appendChild(rfTr);
+    });
+
+    wrap.appendChild(tbl);
+  },
+
+  toggleRange(rname, btn) {
+    const id = `rf-${rname.replace(/\s+/g,'_')}`;
+    const row = document.getElementById(id);
+    if (!row) return;
+    const show = row.style.display==='none';
+    row.style.display = show?'table-row':'none';
+    if (show) {
+      // Pre-fill dates with plan start/end
+      const fromId = `rf-from-${rname.replace(/\s+/g,'_')}`;
+      const toId   = `rf-to-${rname.replace(/\s+/g,'_')}`;
+      document.getElementById(fromId).value = document.getElementById('cfgS').value;
+      document.getElementById(toId).value   = document.getElementById('cfgE').value;
+    }
+  },
+
+  applyRange(rname) {
+    const key  = rname.replace(/\s+/g,'_');
+    const from = document.getElementById(`rf-from-${key}`)?.value;
+    const to   = document.getElementById(`rf-to-${key}`)?.value;
+    const type = document.getElementById(`rf-type-${key}`)?.value || 'absent';
+    if (!from||!to) { this._toast('Please enter both from and to dates','error'); return; }
+    if (to<from) { this._toast('End date must be after start date','error'); return; }
+    const makeAbsent = type==='absent';
+    let changed=0;
+    document.querySelectorAll(`.cc[data-rname="${rname}"]`).forEach(td => {
+      const d=td.dataset.date;
+      if(d>=from && d<=to) {
+        td.dataset.absent=makeAbsent?'1':'0';
+        td.classList.toggle('absent',makeAbsent);
+        td.classList.toggle('avail',!makeAbsent);
+        changed++;
+      }
+    });
+    // Also handle the edge case where rname has special chars
+    this.toggleRange(rname,null);
+    this._toast(`${makeAbsent?'Absent':'Available'} applied to ${changed} day(s) for ${rname}`, 'success');
+  },
+
+  bulkDay(dow, action) {
+    const makeAbsent = action==='absent';
+    let count=0;
+    document.querySelectorAll('.cc').forEach(td => {
+      if(td.dataset.dow===String(dow)) {
+        td.dataset.absent=makeAbsent?'1':'0';
+        td.classList.toggle('absent',makeAbsent);
+        td.classList.toggle('avail',!makeAbsent);
+        count++;
+      }
+    });
+    const dayName = dow===6?'Saturdays':'Sundays';
+    this._toast(`${count} ${dayName} marked ${makeAbsent?'absent':'available'}`, 'success');
+  },
+
+  bulkAll(action) {
+    const makeAbsent = action==='absent';
+    document.querySelectorAll('.cc').forEach(td => {
+      td.dataset.absent=makeAbsent?'1':'0';
+      td.classList.toggle('absent',makeAbsent);
+      td.classList.toggle('avail',!makeAbsent);
+    });
+  },
+
+  /* ════════════════════════════════════════════════════════
+     STEP 5 — CONSTRAINTS
+  ════════════════════════════════════════════════════════ */
+  _buildConstraints() {
+    const tbody = document.getElementById('cTbody');
+    // Save prev values
+    const prev = {};
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const k=tr.dataset.key;
+      if(k) prev[k]={min:tr.querySelector('.cmn')?.value||'0',max:tr.querySelector('.cmx')?.value||'999',consec:tr.querySelector('.ccs')?.value||'1'};
+    });
+    tbody.innerHTML='';
+
+    const rnames = this._getResNames();
+    const depts  = this._getDepts();
+
+    rnames.forEach((rname,ri) => {
+      depts.forEach((dept,di) => {
+        // Only show if resource is mapped to dept
+        const rcIdx = this._findResIdx(rname);
+        const mapped = rcIdx!==null ? this._isChipOn(rcIdx, dept.name) : true;
+        if (!mapped) return;
+        const key=`${rname}||${dept.name}`;
+        const p=prev[key]||{min:'0',max:'999',consec:'1'};
+        const color=dc(di);
+        const tr=document.createElement('tr'); tr.dataset.key=key;
+        tr.innerHTML=`
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${dc(ri)};margin-right:6px;vertical-align:middle"></span>${rname}</td>
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:6px;vertical-align:middle"></span>${dept.name}</td>
+          <td><input type="number" class="cmn" value="${p.min}" min="0"/></td>
+          <td><input type="number" class="cmx" value="${p.max}" min="0"/></td>
+          <td><input type="number" class="ccs" value="${p.consec}" min="1" title="Scheduler will try to keep this resource in ${dept.name} for at least this many consecutive days per block"/></td>`;
+        tbody.appendChild(tr);
+      });
+    });
+
+    if(!tbody.children.length) {
+      tbody.innerHTML='<tr><td colspan="5" style="padding:20px;color:var(--t2);text-align:center">No mapped resource-department pairs found. Check Step 3.</td></tr>';
+    }
+  },
+
+  _findResIdx(rname) {
+    let found=null;
+    document.querySelectorAll('.res-card').forEach(card => {
+      if(card.querySelector('.rc-name')?.value.trim()===rname) found=card.dataset.idx;
+    });
+    return found;
+  },
+
+  _isChipOn(rcIdx, dname) {
+    const chips = document.querySelectorAll(`#rchips${rcIdx} .dchip`);
+    for(const c of chips) { if(c.dataset.dname===dname) return c.classList.contains('on'); }
+    return false;
+  },
+
+  /* ════════════════════════════════════════════════════════
+     DATA COLLECTION
+  ════════════════════════════════════════════════════════ */
+  _getDepts() {
+    return [...document.querySelectorAll('.dept-card')].map((dc,i) => ({
+      id: i+1,
+      name:      dc.querySelector('.dc-name')?.value.trim() || `Dept ${i+1}`,
+      min_hours: parseFloat(dc.querySelector('.dc-minh')?.value)||0,
+      max_hours: parseFloat(dc.querySelector('.dc-maxh')?.value)||9999,
+      color:     dc.dataset.color,
+    }));
+  },
+
+  _getResNames() {
+    return [...document.querySelectorAll('.rc-name')].map(i=>i.value.trim()).filter(Boolean);
+  },
+
+  _collect() {
+    const start  = document.getElementById('cfgS').value;
+    const end    = document.getElementById('cfgE').value;
+    const maxAlt = parseInt(document.querySelector('input[name="malt"]:checked')?.value||3);
+
+    const dates = [];
+    for(let d=new Date(start+'T00:00:00'); d<=new Date(end+'T00:00:00'); d.setDate(d.getDate()+1))
+      dates.push(d.toISOString().slice(0,10));
+
+    const departments = this._getDepts();
+    const resources   = [...document.querySelectorAll('.res-card')].map((card,i) => ({
+      id: i+1,
+      name:        card.querySelector('.rc-name')?.value.trim() || `Resource ${i+1}`,
+      daily_hours: parseFloat(card.querySelector('.rc-daily')?.value)||8,
+      min_hours:   parseFloat(card.querySelector('.rc-minh')?.value)||0,
+      max_hours:   parseFloat(card.querySelector('.rc-maxh')?.value)||9999,
+    }));
+
+    // Absence
+    const absence = {};
+    resources.forEach(r => absence[r.name]={});
+    document.querySelectorAll('.cc').forEach(td => {
+      const rn=td.dataset.rname; if(!rn) return;
+      if(!absence[rn]) absence[rn]={};
+      absence[rn][td.dataset.date] = td.dataset.absent==='1';
+    });
+
+    // Mapping (from chips)
+    const mapping = {};
+    resources.forEach(r => {
+      mapping[r.name]={};
+      departments.forEach(d => mapping[r.name][d.name]=false);
+    });
+    document.querySelectorAll('.res-card').forEach(card => {
+      const rname=card.querySelector('.rc-name')?.value.trim(); if(!rname) return;
+      card.querySelectorAll('.dchip').forEach(chip => {
+        mapping[rname][chip.dataset.dname] = chip.classList.contains('on');
+      });
+    });
+    // Ensure all depts exist in mapping (including new ones without chips)
+    resources.forEach(r => { departments.forEach(d => { if(!(d.name in mapping[r.name])) mapping[r.name][d.name]=false; }); });
+
+    // Dept MinMax + Consecutive
+    const deptMinMax={}, consecDays={};
+    document.querySelectorAll('#cTbody tr').forEach(tr => {
+      const k=tr.dataset.key; if(!k) return;
+      const [rname,,dname]=k.split('||');
+      if(!deptMinMax[rname]) deptMinMax[rname]={};
+      if(!consecDays[rname]) consecDays[rname]={};
+      deptMinMax[rname][dname]={min:parseInt(tr.querySelector('.cmn')?.value||0),max:parseInt(tr.querySelector('.cmx')?.value||999)};
+      consecDays[rname][dname]=Math.max(1,parseInt(tr.querySelector('.ccs')?.value||1));
+    });
+
+    // Date labels for rendering
+    const date_labels=dates.map(iso=>{
+      const d=new Date(iso+'T00:00:00');
+      return{iso,day:d.getDate(),dow:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()],
+             month:d.toLocaleString('default',{month:'short'}),is_weekend:d.getDay()===0||d.getDay()===6};
+    });
+
+    return { resources, departments, dates, date_labels, absence, mapping, deptMinMax, consecDays, maxAlternates: maxAlt };
+  },
+
+  /* ════════════════════════════════════════════════════════
+     GENERATE
+  ════════════════════════════════════════════════════════ */
+  generate() {
+    if(!this._valid(this.step)) return;
+
+    document.querySelectorAll('.sp').forEach(p=>p.classList.remove('active'));
+    document.getElementById('pageLoad').classList.add('active');
+    document.getElementById('nStat').textContent='Solving…';
+    document.getElementById('nStat').className='nstat solving';
+
+    const lsIds=['ls1','ls2','ls3','ls4','ls5','ls6','ls7'];
+    let lsi=0;
+    const li=setInterval(()=>{
+      if(lsi>0) document.getElementById(lsIds[lsi-1])?.classList.replace('active','done');
+      if(lsi<lsIds.length){document.getElementById(lsIds[lsi])?.classList.add('active');lsi++;}
+    }, 380);
+
+    setTimeout(()=>{
+      try {
+        const payload = this._collect();
+        const results = this.solver.solve(payload);
+        clearInterval(li);
+        lsIds.forEach(id=>{const e=document.getElementById(id);if(e){e.classList.remove('active');e.classList.add('done');}});
+        this.results = results;
+        this.meta    = { resources: payload.resources, departments: payload.departments, dates: payload.dates, date_labels: payload.date_labels };
+        this._render();
+      } catch(err) {
+        clearInterval(li);
+        this.goto(5);
+        this._toast('Error: '+err.message,'error');
+        console.error(err);
+      }
+    }, 60);
+  },
+
+  /* ════════════════════════════════════════════════════════
+     RENDER RESULTS
+  ════════════════════════════════════════════════════════ */
+  _render() {
+    const results=this.results, meta=this.meta;
+    document.getElementById('nStat').textContent='Done';
+    document.getElementById('nStat').className='nstat done';
+    document.getElementById('btnDl').style.display='flex';
+
+    const allFeas=results.every(r=>r.is_feasible);
+    const totV=results.reduce((s,r)=>s+r.violations.length,0);
+    const stEl=document.getElementById('resStatus');
+    stEl.innerHTML=allFeas
+      ?`<span class="bfeas">✓ Fully Feasible</span><span style="color:var(--t2);font-size:14px">${results.length} schedule(s) generated</span>`
+      :`<span class="bwarn">⚠ ${totV} Violation(s)</span><span style="color:var(--t2);font-size:14px">Best-effort schedule — ${totV} constraint(s) relaxed</span>`;
+
+    const tabs=document.getElementById('resTabs'), cont=document.getElementById('resContent');
+    tabs.innerHTML=''; cont.innerHTML='';
+
+    results.forEach((r,i)=>{
+      const tab=document.createElement('div');
+      tab.className='rtab'+(i===0?' active':'');
+      tab.onclick=()=>this._tab(i);
+      const bc=r.is_feasible?'ok':'er', bt=r.is_feasible?'OK':`${r.violations.length} violation(s)`;
+      tab.innerHTML=`${r.label} <span class="tbadge ${bc}">${bt}</span>`;
+      tabs.appendChild(tab);
+      const panel=document.createElement('div');
+      panel.className='rtp'+(i===0?' active':'');
+      panel.innerHTML=this._buildPanel(r,meta);
+      cont.appendChild(panel);
+    });
+
+    document.querySelectorAll('.sp').forEach(p=>p.classList.remove('active'));
+    document.getElementById('pageRes').classList.add('active');
+    document.querySelectorAll('.si').forEach(si=>{si.classList.remove('active');si.classList.add('done');});
+  },
+
+  _tab(i) {
+    document.querySelectorAll('.rtab').forEach((t,j)=>t.classList.toggle('active',j===i));
+    document.querySelectorAll('.rtp').forEach((p,j)=>p.classList.toggle('active',j===i));
+  },
+
+  _buildPanel(result, meta) {
+    const depts=meta.departments, dMap={};
+    depts.forEach((d,i)=>dMap[d.name]=i);
+    const totA=Object.values(result.assignment).reduce((s,days)=>s+Object.values(days).filter(v=>v&&v!=='__absent__').length,0);
+    const totAb=Object.values(result.assignment).reduce((s,days)=>s+Object.values(days).filter(v=>v==='__absent__').length,0);
+
+    let h=`<div class="srow">
+      <div class="scard"><div class="slbl">Status</div><div class="sval" style="font-size:17px;color:${result.is_feasible?'var(--ok)':'var(--wa)'}">${result.is_feasible?'✓ Feasible':'⚠ Violations'}</div></div>
+      <div class="scard"><div class="slbl">Assignments</div><div class="sval" style="color:var(--blue)">${totA}</div><div class="ssub">person-days</div></div>
+      <div class="scard"><div class="slbl">Absent Days</div><div class="sval" style="color:var(--t3)">${totAb}</div></div>
+      <div class="scard"><div class="slbl">Violations</div><div class="sval" style="color:${result.violations.length?'var(--er)':'var(--ok)'}">${result.violations.length}</div></div>
+    </div>`;
+    h += this._calHtml(result, meta);
+    h += this._resSum(result, meta);
+    h += this._deptSum(result, meta);
+    if(result.violations.length) h += this._violHtml(result.violations);
+    return h;
+  },
+
+  _calHtml(result, meta) {
+    const dates=meta.date_labels, dMap={};
+    meta.departments.forEach((d,i)=>dMap[d.name]=i);
+    const months={};
+    dates.forEach(d=>{const mk=d.iso.slice(0,7);months[mk]=(months[mk]||0)+1;});
+
+    let h=`<div class="stit">Schedule Calendar</div><div class="sw"><table class="stbl"><thead>`;
+    h+=`<tr><th class="rc" style="min-width:130px">Resource</th>`;
+    Object.entries(months).forEach(([mk,cnt])=>{
+      const lbl=new Date(mk+'-01').toLocaleString('default',{month:'short',year:'numeric'});
+      h+=`<th class="mc" colspan="${cnt}">${lbl}</th>`;
+    });
+    h+=`</tr><tr><th class="rc"></th>`;
+    dates.forEach(d=>{const st=d.is_weekend?'color:#f87171':'';h+=`<th style="${st}">${d.day}<br/><span style="color:var(--t3);font-size:7px">${d.dow}</span></th>`;});
+    h+=`</tr></thead><tbody>`;
+
+    meta.resources.forEach(res=>{
+      h+=`<tr><td class="rc">${res.name}</td>`;
+      dates.forEach(d=>{
+        const val=result.assignment[res.name]?.[d.iso];
+        if(val==='__absent__'){h+=`<td class="sdcell abs${d.is_weekend?' wknd':''}" title="${res.name} — ${d.iso} — Absent">A</td>`;}
+        else if(val){
+          const di=dMap[val]??0;
+          h+=`<td class="sdcell" style="background:${DC[di%DC.length]};color:${DCT[di%DCT.length]}" title="${val}">${val.slice(0,3).toUpperCase()}</td>`;
+        } else {
+          h+=`<td class="sdcell${d.is_weekend?' wknd':' una'}" title="${res.name} — ${d.iso} — Unassigned">·</td>`;
+        }
+      });
+      h+=`</tr>`;
+    });
+    // Legend
+    h+=`<tr><td class="rc" colspan="${dates.length+1}" style="padding:8px 12px;color:var(--t3);font-size:10px"><strong>Legend:</strong>&nbsp;`;
+    meta.departments.forEach((d,i)=>h+=`<span class="dchip-s" style="background:${DC[i%DC.length]};color:${DCT[i%DCT.length]}">${d.name.slice(0,3).toUpperCase()}</span> = ${d.name}&nbsp;&nbsp;`);
+    h+=`<span class="dchip-s" style="background:rgba(100,116,139,.4);color:var(--t2)">A</span> = Absent&nbsp;&nbsp;<span style="color:var(--t3)">·</span> = Unassigned</td></tr>`;
+    h+=`</tbody></table></div>`;
+    return h;
+  },
+
+  _resSum(result, meta) {
+    const depts=meta.departments;
+    let h=`<div class="stit">Resource Summary</div><table class="smtbl"><thead><tr>
+      <th>Resource</th><th>Work Days</th><th>Work Hours</th><th>Absent Days</th>`;
+    depts.forEach((d,i)=>h+=`<th><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${dc(i)};margin-right:4px;vertical-align:middle"></span>${d.name}</th>`);
+    h+=`<th>Status</th></tr></thead><tbody>`;
+    result.summary.resources.forEach(r=>{
+      const pct=r.max_hours<9999?Math.min(100,(r.total_hours/r.max_hours)*100):r.min_hours>0?Math.min(100,(r.total_hours/r.min_hours)*100):50;
+      const bc=r.hours_ok?'ok':'er';
+      h+=`<tr><td style="font-weight:600">${r.name}</td><td>${r.total_days}</td>
+        <td>${r.total_hours}h<div class="pbw"><div class="pb ${bc}" style="width:${pct}%"></div></div>
+        <div style="font-size:10px;color:var(--t3)">min ${r.min_hours}h / max ${r.max_hours>=9999?'∞':r.max_hours+'h'}</div></td>
+        <td>${r.absent_days}</td>`;
+      depts.forEach(d=>h+=`<td style="text-align:center">${r.dept_days[d.name]??0}</td>`);
+      h+=`<td>${r.hours_ok?'<span class="bok">✓ OK</span>':'<span class="berr">✗ Violation</span>'}</td></tr>`;
+    });
+    h+=`</tbody></table>`;
+    return h;
+  },
+
+  _deptSum(result, meta) {
+    let h=`<div class="stit">Department Summary</div><table class="smtbl"><thead><tr>
+      <th>Department</th><th>Total Hours</th><th>Min Required</th><th>Max Allowed</th><th>Coverage</th><th>Status</th>
+    </tr></thead><tbody>`;
+    result.summary.departments.forEach((d,i)=>{
+      const pct=d.max_hours<9999?Math.min(100,(d.total_hours/d.max_hours)*100):d.min_hours>0?Math.min(100,(d.total_hours/d.min_hours)*100):50;
+      const bc=d.ok?'ok':'er';
+      h+=`<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${dc(i)};margin-right:7px;vertical-align:middle"></span><strong>${d.name}</strong></td>
+        <td>${d.total_hours}h</td><td>${d.min_hours}h</td><td>${d.max_hours>=9999?'∞':d.max_hours+'h'}</td>
+        <td style="min-width:120px"><div class="pbw"><div class="pb ${bc}" style="width:${pct}%"></div></div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">${d.total_hours}h of ${d.min_hours}h min</div></td>
+        <td>${d.ok?'<span class="bok">✓ OK</span>':'<span class="berr">✗ Violation</span>'}</td></tr>`;
+    });
+    h+=`</tbody></table>`;
+    return h;
+  },
+
+  _violHtml(violations) {
+    const sc={High:'sh',Medium:'sm',Low:'sl'};
+    let h=`<div style="margin-bottom:22px"><div class="stit" style="color:var(--er)">Constraint Violations</div>
+      <table class="vtbl"><thead><tr><th>ID</th><th>Type</th><th>Resource</th><th>Department</th><th>Details</th><th>Severity</th></tr></thead><tbody>`;
+    violations.forEach(v=>{
+      h+=`<tr><td>${v.violation_id}</td><td>${v.vtype}</td>
+        <td>${v.resource!=='-'?v.resource:'—'}</td><td>${v.department!=='-'?v.department:'—'}</td>
+        <td style="max-width:340px;line-height:1.4">${v.details}</td>
+        <td class="${sc[v.severity]||''}">${v.severity}</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+    return h;
+  },
+
+  downloadExcel() {
+    if(!this.results){this._toast('Generate a schedule first','error');return;}
+    this.exporter.export(this.results,this.meta);
+    this._toast('Excel download started','success');
+  },
+
+  _toast(msg,type='') {
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.className=`toast ${type} show`;
+    clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3500);
+  },
+};
+
+document.addEventListener('DOMContentLoaded',()=>App.init());
+</script>
+</body>
+</html>
